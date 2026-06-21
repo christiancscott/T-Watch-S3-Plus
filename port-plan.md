@@ -9,6 +9,31 @@
 
 ---
 
+## 0. Live progress
+
+> Tracking the actual implementation on branch `claude/eloquent-galileo-yxdevo` (PR #1). The
+> `t-watch-s3-plus` PlatformIO env **compiles green in CI**, which also publishes the web flasher
+> to GitHub Pages.
+
+| Area | Status |
+|---|---|
+| Phase 0 — build system (env, pin header, `config.h`) | ✅ done |
+| Phase 1a — display (ST7789), framebuffer, touch (FT6336U on Wire1) | ✅ done |
+| Phase 1b — AXP2101 PMU (XPowersLib) + power button | ✅ done |
+| Phase 1c — BMA423 IMU + PCF8563 RTC + DRV2605 haptics | ✅ done |
+| Phase 1d — audio (MAX98357A) | ⏸️ **deferred** — ESP8266Audio has no version compatible with both the S3 and arduino‑esp32 2.0.x; needs a direct ESP‑IDF `driver/i2s.h` driver |
+| GUI/app guards (IRController stub, tile layouts) | ✅ done |
+| CI cloud build + downloadable artifact + **web flasher on GitHub Pages** | ✅ done |
+| Phase 2 — GPS (MIA‑M10Q over Serial2) | ✅ compiles (needs AXP2101 GPS rail confirmed for live fix) |
+| Phase 2 — LoRa (SX1262), IR (GPIO2), PDM mic | ⏳ pending |
+| On‑device validation | ⏳ not yet flashed/tested on real hardware |
+
+**Key follow‑ups for real hardware:** audio I²S driver; AXP2101 rail map (which rails feed display/
+touch/GPS/LoRa); confirm display RST/backlight polarity; tune BMA axis remap and power saving.
+
+---
+
+
 ## 1. Executive summary
 
 The good news: this is a **far smaller job than a typical port** because most of the T‑Watch S3 Plus
