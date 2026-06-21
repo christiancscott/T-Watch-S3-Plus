@@ -41,8 +41,12 @@
 
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
-    #elif defined( LILYGO_WATCH_2021 )
-        #include <twatch2021_config.h>
+    #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
+        #if defined( LILYGO_WATCH_S3_PLUS )
+            #include <twatch_s3_plus_config.h>
+        #else
+            #include <twatch2021_config.h>
+        #endif
         #include <Arduino.h>
         #include <Wire.h>
         #include <bma.h>
@@ -132,7 +136,7 @@ void bma_setup( void ) {
                 log_w("stepcounter not valid. reset");
             }
             stepcounter = stepcounter + stepcounter_before_reset;
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             if ( stepcounter_valid != 0xa5a5a5a5 ) {
                 stepcounter = 0;
                 stepcounter_before_reset = 0;
@@ -166,7 +170,7 @@ void bma_setup( void ) {
              */
             pinMode( BMA423_INT1, INPUT );
             attachInterrupt( BMA423_INT1, bma_irq, GPIO_INTR_POSEDGE );
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             ASSERT( bma.begin( readRegister, writeRegister, delay ), "BMA423 was not found. Please check wiring/power." );
             /**
              * config Accel
@@ -249,7 +253,7 @@ bool bma_powermgm_event_cb( EventBits_t event, void *arg ) {
                 case POWERMGM_DISABLE_INTERRUPTS:
                                                 detachInterrupt( BMA423_INT1 );
                                                 break;
-            #elif defined( LILYGO_WATCH_2021 )
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 case POWERMGM_ENABLE_INTERRUPTS:
                                                 attachInterrupt( BMA_INT_1, bma_irq, GPIO_INTR_POSEDGE );
                                                 break;
@@ -309,7 +313,7 @@ bool bma_powermgm_loop_cb( EventBits_t event , void *arg ) {
                 if ( ttgo->bma->isStepCounter() ) {
                     BMA_stepcounter = true;
                 }
-            #elif defined( LILYGO_WATCH_2021 )
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 /*
                 * set powermgm wakeup event and save BMA_* event
                 */
@@ -378,7 +382,7 @@ void bma_notify_stepcounter( void ) {
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
             stepcounter_before_reset = ttgo->bma->getCounter();
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             stepcounter_before_reset = bma.getCounter();
         #elif defined( WT32_SC01 )
 
@@ -401,7 +405,7 @@ void bma_standby( void ) {
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->bma->enableStepCountInterrupt( false );
-            #elif defined( LILYGO_WATCH_2021 )
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 bma.enableStepCountInterrupt( false );
             #elif defined( WT32_SC01 )
 
@@ -417,7 +421,7 @@ void bma_standby( void ) {
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             gpio_wakeup_enable ( (gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL);
             esp_sleep_enable_gpio_wakeup ();
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             gpio_wakeup_enable ( (gpio_num_t)BMA_INT_1, GPIO_INTR_POSEDGE );
             esp_sleep_enable_gpio_wakeup ();
         #elif defined( WT32_SC01 )
@@ -439,7 +443,7 @@ void bma_wakeup( void ) {
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->bma->enableStepCountInterrupt( true );
-            #elif defined( LILYGO_WATCH_2021 )
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 bma.enableStepCountInterrupt( true );
             #elif defined( WT32_SC01 )
 
@@ -477,7 +481,7 @@ void bma_wakeup( void ) {
                 #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                     TTGOClass *ttgo = TTGOClass::getWatch();
                     ttgo->bma->resetStepCounter();
-                #elif defined( LILYGO_WATCH_2021 )
+                #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                     bma.resetStepCounter();
                 #elif defined( WT32_SC01 )
                 #endif
@@ -506,7 +510,7 @@ void bma_reload_settings( void ) {
             ttgo->bma->enableStepCountInterrupt( bma_config.enable[ BMA_STEPCOUNTER ] );
             ttgo->bma->enableWakeupInterrupt( bma_config.enable[ BMA_DOUBLECLICK ] );
             ttgo->bma->enableTiltInterrupt( bma_config.enable[ BMA_TILT ] );
-        #elif defined( LILYGO_WATCH_2021 )    
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )    
             bma.enableStepCountInterrupt( bma_config.enable[ BMA_STEPCOUNTER ] );
             bma.enableWakeupInterrupt( bma_config.enable[ BMA_DOUBLECLICK ] );
             bma.enableTiltInterrupt( bma_config.enable[ BMA_TILT ] );
@@ -596,7 +600,7 @@ void bma_set_rotate_tilt( uint32_t rotation ) {
                             ttgo->bma->set_remap_axes(&remap_data);
                             break;
             }
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             struct bma423_axes_remap remap_data;
             rotation = rotation % 360;
             switch( rotation / 90 ) {
@@ -651,7 +655,7 @@ void bma_reset_stepcounter( void ) {
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
             ttgo->bma->resetStepCounter();
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             bma.resetStepCounter();
         #elif defined( WT32_SC01 )
 

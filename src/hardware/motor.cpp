@@ -103,6 +103,11 @@
         }
     #elif defined( WT32_SC01 )
 
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include <twatch_s3_plus_config.h>
+        #include <Adafruit_DRV2605.h>
+
+        static Adafruit_DRV2605 *drv = NULL;
     #else
         #warning "no hardware driver for motor/vibe"
     #endif
@@ -152,7 +157,7 @@ void motor_setup( void ) {
                 log_e("Motor init: I2C device not found, error %d", err);
                 drv = NULL;    
             }     
-        #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( LILYGO_WATCH_2021 ) 
+        #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( LILYGO_WATCH_2021 )
             pinMode(MOTOR_PIN, OUTPUT);
             timer = timerBegin(0, 80, true);
             timerAttachInterrupt(timer, &onTimer, true);
@@ -160,6 +165,30 @@ void motor_setup( void ) {
             timerAlarmEnable(timer);
         #elif defined( WT32_SC01 )
 
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            /**
+             * DRV2605 haptic driver on the main I2C bus
+             */
+            Wire.beginTransmission( DRV2605_SLAVE_ADDRESS );
+            if ( Wire.endTransmission() == 0 ) {
+                log_d("Motor init: DRV2605 found at address 0x%02x", DRV2605_SLAVE_ADDRESS );
+                drv = new Adafruit_DRV2605();
+                if ( drv->begin() ) {
+                    drv->setMode( DRV2605_MODE_INTTRIG );
+                    drv->selectLibrary( 1 );
+                    drv->setWaveform( 0, 75 ); // Transition Ramp Down Short Smooth 2 - 100 to 0%
+                    drv->setWaveform( 2, 0 );  // end of waveforms
+                }
+                else {
+                    log_e("Motor init: DRV2605 begin failed");
+                    delete drv;
+                    drv = NULL;
+                }
+            }
+            else {
+                log_e("Motor init: DRV2605 not found");
+                drv = NULL;
+            }
         #endif
     #endif
     /*
@@ -181,7 +210,7 @@ bool motor_powermgm_event_cb( EventBits_t event, void *arg ) {
 
     #else
         #if defined( M5PAPER )
-        #elif defined( LILYGO_WATCH_2020_V2 )
+        #elif defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_S3_PLUS )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( LILYGO_WATCH_2021 )
             switch( event ) {
                 case POWERMGM_SILENCE_WAKEUP:   portENTER_CRITICAL(&timerMux);
@@ -233,7 +262,7 @@ void motor_vibe( int time, bool enforced ) {
             * leave critical section
             */
             portEXIT_CRITICAL(&timerMux);
-        #elif defined( LILYGO_WATCH_2020_V2 )
+        #elif defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_S3_PLUS )
             if (drv!=NULL) {
                 /**
                  * play the effect!

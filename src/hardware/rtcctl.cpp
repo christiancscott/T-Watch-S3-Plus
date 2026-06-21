@@ -44,7 +44,7 @@
         #include <M5Core2.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include "TTGO.h"
-    #elif defined( LILYGO_WATCH_2021 )
+    #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         #include <PCF8563/pcf8563.h>
         #include <Wire.h>
 
@@ -100,7 +100,7 @@ void rtcctl_setup( void ) {
 
         pinMode( RTC_INT_PIN, INPUT_PULLUP);
         attachInterrupt( RTC_INT_PIN, &rtcctl_irq, FALLING );
-    #elif defined( LILYGO_WATCH_2021 )
+    #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         #include <twatch2021_config.h>
 
         rtc.begin();
@@ -180,7 +180,7 @@ void set_next_alarm( void ) {
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         TTGOClass *ttgo = TTGOClass::getWatch();
         ttgo->rtc->setAlarm( PCF8563_NO_ALARM, PCF8563_NO_ALARM, PCF8563_NO_ALARM, PCF8563_NO_ALARM );    
-    #elif defined( LILYGO_WATCH_2021 )
+    #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         rtc.setAlarm( PCF8563_NO_ALARM, PCF8563_NO_ALARM, PCF8563_NO_ALARM, PCF8563_NO_ALARM );        
     #elif defined( WT32_SC01 )
 
@@ -231,7 +231,7 @@ void set_next_alarm( void ) {
          */
         TTGOClass *ttgo = TTGOClass::getWatch();
         ttgo->rtc->setAlarm( alarm_tm.tm_hour, alarm_tm.tm_min, alarm_tm.tm_mday, PCF8563_NO_ALARM );
-    #elif defined( LILYGO_WATCH_2021 )
+    #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         rtc.setAlarm( alarm_tm.tm_hour, alarm_tm.tm_min, alarm_tm.tm_mday, PCF8563_NO_ALARM );
     #elif defined( WT32_SC01 )
 
@@ -255,7 +255,7 @@ void rtcctl_set_next_alarm( void ) {
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         TTGOClass *ttgo = TTGOClass::getWatch();
         ttgo->rtc->disableAlarm();
-    #elif defined( LILYGO_WATCH_2021 )
+    #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         rtc.disableAlarm();
     #elif defined( WT32_SC01 )
 
@@ -278,7 +278,7 @@ void rtcctl_set_next_alarm( void ) {
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         TTGOClass *ttgo = TTGOClass::getWatch();
         ttgo->rtc->enableAlarm();
-    #elif defined( LILYGO_WATCH_2021 )
+    #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         rtc.enableAlarm();
     #elif defined( WT32_SC01 )
 
@@ -321,7 +321,7 @@ bool rtcctl_powermgm_event_cb( EventBits_t event, void *arg ) {
                                             #elif defined( M5CORE2 )
                                             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                                                 attachInterrupt( RTC_INT_PIN, &rtcctl_irq, FALLING );
-                                            #elif defined( LILYGO_WATCH_2021 )
+                                            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                                             #elif defined( WT32_SC01 )
                                             #else
                                                 #warning "no rtcctl powermgm enable interrupts event"
@@ -336,7 +336,7 @@ bool rtcctl_powermgm_event_cb( EventBits_t event, void *arg ) {
                                             #elif defined( M5CORE2 )
                                             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                                                 detachInterrupt( RTC_INT_PIN );
-                                            #elif defined( LILYGO_WATCH_2021 )
+                                            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                                             #elif defined( WT32_SC01 )
                                             #else
                                                 #warning "no rtcctl powermgm disable interrupts event"
@@ -410,7 +410,7 @@ void rtcctl_set_alarm( rtcctl_alarm_t *data ) {
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->rtc->disableAlarm();
-            #elif defined( LILYGO_WATCH_2021 )
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 rtc.disableAlarm();
             #elif defined( WT32_SC01 )
             #else
@@ -443,7 +443,7 @@ void rtcctl_set_alarm( rtcctl_alarm_t *data ) {
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->rtc->enableAlarm();
-            #elif defined( LILYGO_WATCH_2021 )
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 rtc.enableAlarm();
             #elif defined( WT32_SC01 )
 
@@ -463,7 +463,7 @@ void rtcctl_set_alarm( rtcctl_alarm_t *data ) {
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->rtc->enableAlarm();
-            #elif defined( LILYGO_WATCH_2021 )
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 rtc.enableAlarm();
             #elif defined( WT32_SC01 )
 
@@ -538,7 +538,7 @@ void rtcctl_syncToSystem( void ) {
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
             ttgo->rtc->syncToSystem();
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             rtc.syncToSystem();
         #elif defined( WT32_SC01 )
         #endif
@@ -598,7 +598,7 @@ void rtcctl_syncToRtc( void ) {
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
             ttgo->rtc->syncToRtc();
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             rtc.syncToRtc();
         #elif defined( WT32_SC01 )
         #endif
