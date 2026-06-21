@@ -54,6 +54,33 @@ touch_config_t touch_config;
         #include <Adafruit_FT6206.h>
 
         Adafruit_FT6206 ctp = Adafruit_FT6206();
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include <Wire.h>
+        #include <twatch_s3_plus_config.h>
+
+        /**
+         * Minimal FocalTech FT6336U reader on the dedicated touch bus ( Wire1 ).
+         * Avoids pulling in a second Bosch-driver library ( SensorLib ) that would
+         * clash with BMA423_Library used by the accelerometer.
+         */
+        static bool ft6336_read_point( int16_t &x, int16_t &y ) {
+            Wire1.beginTransmission( FT6336_SLAVE_ADDRESS );
+            Wire1.write( 0x02 );                                     /* TD_STATUS register */
+            if ( Wire1.endTransmission( false ) != 0 )
+                return( false );
+            if ( Wire1.requestFrom( (uint8_t)FT6336_SLAVE_ADDRESS, (uint8_t)5 ) != 5 )
+                return( false );
+            uint8_t td_status = Wire1.read();                       /* 0x02 number of points */
+            uint8_t xh = Wire1.read();                              /* 0x03 */
+            uint8_t xl = Wire1.read();                              /* 0x04 */
+            uint8_t yh = Wire1.read();                              /* 0x05 */
+            uint8_t yl = Wire1.read();                              /* 0x06 */
+            if ( ( td_status & 0x0F ) == 0 )
+                return( false );
+            x = ( ( xh & 0x0F ) << 8 ) | xl;
+            y = ( ( yh & 0x0F ) << 8 ) | yl;
+            return( true );
+        }
     #else
         #error "no hardware driver for touch, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -149,6 +176,12 @@ void touch_setup( void ) {
     #elif defined( WT32_SC01 )
         pinMode( GPIO_NUM_39, INPUT );
         ASSERT( ctp.begin(40), "Couldn't start FT6206 touchscreen controller");
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        /*
+        * FT6336U lives on its own I2C bus ( Wire1, GPIO39/40 ), already begun in hardware_setup().
+        * Touch is polled; just configure the interrupt pin as input.
+        */
+        pinMode( TOUCH_INT, INPUT );
     #else
         #error "no touch init implemented, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -227,7 +260,7 @@ bool touch_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
             }
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             retval = true;
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             retval = true;
         #elif defined( WT32_SC01 )
             switch( event ) {
@@ -272,7 +305,7 @@ bool touch_powermgm_event_cb( EventBits_t event, void *arg ) {
                                                 break;
         }
     #else
-        #if defined( M5PAPER ) || defined( LILYGO_WATCH_2021 )
+        #if defined( M5PAPER ) || defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             switch( event ) {
                 case POWERMGM_STANDBY:          log_d("go standby");
                                                 retval = true;
@@ -461,6 +494,13 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
             else {
                 return( false );
             }
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            if ( ft6336_read_point( x, y ) ) {
+                return( true );
+            }
+            else {
+                return( false );
+            }
         #else
             #error "no touch getXY function implemented, please setup minimal drivers ( display/framebuffer/touch )"
         #endif
@@ -565,7 +605,7 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
                     }
                     break;
             }
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
         #elif defined( WT32_SC01 )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;

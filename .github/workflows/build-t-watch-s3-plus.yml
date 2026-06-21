@@ -1,0 +1,142 @@
+name: Build T-Watch S3 Plus
+
+# Cloud build for the ESP32-S3 port. The build job runs on every branch and
+# uploads the flashable binaries + web flasher as a downloadable artifact.
+# A separate deploy job publishes the flasher to GitHub Pages from the
+# default branch (the github-pages environment only permits the default
+# branch, so it must not gate the build job).
+
+on:
+  push:
+    branches:
+      - claude/eloquent-galileo-yxdevo
+      - master
+    paths:
+      - 'src/**'
+      - 'lib/**'
+      - 'platformio.ini'
+      - '*.csv'
+      - 'flasher/**'
+      - '.github/workflows/build-t-watch-s3-plus.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: t-watch-s3-plus-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Build firmware
+        run: pio run -e t-watch-s3-plus
+
+      - name: Merge flashable image
+        run: |
+          BUILD=.pio/build/t-watch-s3-plus
+          BOOT_APP0="$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)"
+          ESPTOOL="$(find ~/.platformio/packages/tool-esptoolpy -name esptool.py | head -1)"
+          echo "boot_app0: $BOOT_APP0"
+          echo "esptool:   $ESPTOOL"
+          test -n "$BOOT_APP0" || { echo "::error::boot_app0.bin not found"; exit 1; }
+          test -n "$ESPTOOL"   || { echo "::error::esptool.py not found"; exit 1; }
+          python "$ESPTOOL" --chip esp32s3 merge_bin -o "$BUILD/firmware-merged.bin" \
+            --flash_mode dio --flash_freq 80m --flash_size 16MB \
+            0x0     "$BUILD/bootloader.bin" \
+            0x8000  "$BUILD/partitions.bin" \
+            0xe000  "$BOOT_APP0" \
+            0x10000 "$BUILD/firmware.bin"
+
+      - name: Verify merged image is bootable
+        # A flashable ESP image must begin with the magic byte 0xE9 (the second
+        # stage bootloader). If it does not, the chip writes the file fine but
+        # never boots. Fail the build here so a broken image can never be
+        # published to the artifact or the Pages flasher.
+        run: |
+          BUILD=.pio/build/t-watch-s3-plus
+          F="$BUILD/firmware-merged.bin"
+          test -s "$F" || { echo "::error::firmware-merged.bin missing or empty"; exit 1; }
+          MAGIC="$(od -An -tx1 -N1 "$F" | tr -d ' \n')"
+          SIZE="$(wc -c < "$F")"
+          echo "firmware-merged.bin: first byte 0x$MAGIC, $SIZE bytes"
+          if [ "$MAGIC" != "e9" ]; then
+            echo "::error::firmware-merged.bin does not start with ESP image magic 0xE9 (got 0x$MAGIC) — it would not boot"
+            exit 1
+          fi
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: t-watch-s3-plus-firmware
+          if-no-files-found: warn
+          path: |
+            .pio/build/t-watch-s3-plus/firmware.bin
+            .pio/build/t-watch-s3-plus/firmware-merged.bin
+            .pio/build/t-watch-s3-plus/bootloader.bin
+            .pio/build/t-watch-s3-plus/partitions.bin
+            flasher/index.html
+            flasher/README.md
+
+      - name: Assemble Pages site
+        run: |
+          mkdir -p site
+          cp flasher/index.html site/index.html
+          cp flasher/README.md site/README.md
+          cp .pio/build/t-watch-s3-plus/firmware-merged.bin site/firmware-merged.bin
+          cp .pio/build/t-watch-s3-plus/firmware.bin       site/firmware.bin
+          ls -la site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # Publish the flasher to GitHub Pages. Kept as a separate job so a Pages /
+  # environment problem can never block the build (and therefore the
+  # downloadable artifact) on a feature branch. Deploys from the active dev
+  # branch as well as master so the hosted flasher always serves the latest
+  # build. NOTE: the github-pages environment must allow these branches under
+  # Settings -> Environments -> github-pages -> Deployment branches (or set it
+  # to "No restriction"), otherwise this job fails the environment gate.
+  deploy-pages:
+    needs: build
+    if: >-
+      github.ref == 'refs/heads/master' ||
+      github.ref == 'refs/heads/claude/eloquent-galileo-yxdevo'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

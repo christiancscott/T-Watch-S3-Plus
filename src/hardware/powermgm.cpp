@@ -43,7 +43,11 @@
     EventGroupHandle_t powermgm_status = NULL;
     TaskHandle_t _powermgmTask;
     portMUX_TYPE DRAM_ATTR powermgmMux = portMUX_INITIALIZER_UNLOCKED;
-    esp_pm_config_esp32_t pm_config;
+    #if defined( CONFIG_IDF_TARGET_ESP32S3 )
+        esp_pm_config_esp32s3_t pm_config;          /* ESP32-S3 power-management config */
+    #else
+        esp_pm_config_esp32_t pm_config;            /* original ESP32 power-management config */
+    #endif
 #endif
 
 callback_t *powermgm_callback = NULL;

@@ -38,6 +38,8 @@
     #elif defined( LILYGO_WATCH_2021 )
         #include <twatch2021_config.h>
     #elif defined( WT32_SC01 )
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include <twatch_s3_plus_config.h>
     #else
         #error "no hardware driver for display, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -76,7 +78,7 @@ void display_setup( void ) {
             ttgo->bl->adjust( 0 );
             ttgo->tft->setRotation( display_config.rotation / 90 );
             bma_set_rotate_tilt( display_config.rotation );
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             pinMode(TFT_LED, OUTPUT);
             ledcSetup(0, 4000, 8);
             ledcAttachPin(TFT_LED, 0);
@@ -173,7 +175,7 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
             }
 
             retval = true;
-        #elif defined( LILYGO_WATCH_2021 )   
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             /**
              * check if backlight adjust has change
              */
@@ -270,7 +272,7 @@ static void display_standby( void ) {
                 ttgo->power->setPowerOutPut( AXP202_LDO2, false );
                 ttgo->power->setPowerOutPut( AXP202_LDO3, false );
             #endif
-        #elif defined( LILYGO_WATCH_2021 )   
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             ledcWrite( 0, 0 );
         #elif defined( WT32_SC01 )
             ledcWrite( 0, 0 );
@@ -308,7 +310,7 @@ static void display_wakeup( bool silence ) {
                 ttgo->bl->adjust( 0 );
                 brightness = 0;
                 dest_brightness = 0;
-            #elif defined( LILYGO_WATCH_2021 )   
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 ledcWrite( 0, 0 );
                 brightness = 0;
                 dest_brightness = 0;
@@ -345,7 +347,7 @@ static void display_wakeup( bool silence ) {
                 ttgo->bl->adjust( 0 );
                 brightness = 0;
                 dest_brightness = display_get_brightness();
-            #elif defined( LILYGO_WATCH_2021 )   
+            #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
                 ledcWrite( 0, 0 );
                 brightness = 0;
                 dest_brightness = display_get_brightness();

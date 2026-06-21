@@ -50,6 +50,12 @@
         #include <twatch2021_config.h>
     #elif defined( WT32_SC01 )
 
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include <twatch_s3_plus_config.h>
+        #define XPOWERS_CHIP_AXP2101
+        #include <XPowersLib.h>
+
+        XPowersPMU PMU;
     #else
         #warning "no hardware driver for pmu"
     #endif
@@ -162,7 +168,7 @@ void pmu_setup( void ) {
         */
         pinMode( AXP202_INT, INPUT );
         attachInterrupt( AXP202_INT, &pmu_irq, FALLING );
-    #elif defined( LILYGO_WATCH_2021 )    
+    #elif defined( LILYGO_WATCH_2021 )
         pinMode( PWR_ON, OUTPUT );
         digitalWrite( PWR_ON, HIGH );
         pinMode( CHARGE, INPUT_PULLUP );
@@ -170,6 +176,42 @@ void pmu_setup( void ) {
         attachInterrupt( CHARGE, &pmu_irq, CHANGE );
     #elif defined( WT32_SC01 )
 
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        /**
+         * AXP2101 power management on the main I2C bus ( already begun in hardware_setup )
+         * NOTE: XPowersLib method names verified against lewisxhe/XPowersLib; confirm with a build.
+         */
+        log_i("init AXP2101 pmu controller");
+        if ( !PMU.begin( Wire, AXP2101_SLAVE_ADDRESS, IICSDA, IICSCL ) ) {
+            log_e("AXP2101 init failed!");
+        }
+        else {
+            /**
+             * enable the ADC measurements we read back later
+             */
+            PMU.enableBattDetection();
+            PMU.enableVbusVoltageMeasure();
+            PMU.enableBattVoltageMeasure();
+            PMU.enableSystemVoltageMeasure();
+            /**
+             * basic charge settings ( 4.2V target, 300mA ) - tune once measured on hardware
+             */
+            PMU.setChargeTargetVoltage( XPOWERS_AXP2101_CHG_VOL_4V2 );
+            PMU.setChargerConstantCurr( XPOWERS_AXP2101_CHG_CUR_300MA );
+            /**
+             * clear and (re)arm the interrupts we care about
+             */
+            PMU.disableIRQ( XPOWERS_AXP2101_ALL_IRQ );
+            PMU.clearIrqStatus();
+            PMU.enableIRQ( XPOWERS_AXP2101_VBUS_INSERT_IRQ | XPOWERS_AXP2101_VBUS_REMOVE_IRQ |
+                           XPOWERS_AXP2101_BAT_INSERT_IRQ | XPOWERS_AXP2101_BAT_REMOVE_IRQ |
+                           XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ );
+        }
+        /**
+         * register IRQ pin
+         */
+        pinMode( AXP2101_INT, INPUT );
+        attachInterrupt( AXP2101_INT, &pmu_irq, FALLING );
     #endif
 #endif
     /*
@@ -222,6 +264,15 @@ bool pmu_powermgm_event_cb( EventBits_t event, void *arg ) {
                                                 break;
                 case POWERMGM_DISABLE_INTERRUPTS:
                                                 detachInterrupt( AXP202_INT );
+                                                retval = true;
+                                                break;
+            #elif defined( LILYGO_WATCH_S3_PLUS )
+                case POWERMGM_ENABLE_INTERRUPTS:
+                                                attachInterrupt( AXP2101_INT, &pmu_irq, FALLING );
+                                                retval = true;
+                                                break;
+                case POWERMGM_DISABLE_INTERRUPTS:
+                                                detachInterrupt( AXP2101_INT );
                                                 retval = true;
                                                 break;
             #endif
@@ -436,6 +487,47 @@ void pmu_loop( void ) {
             battery = percent > 0 ? true : false;
             log_e("hello Mc Fly, witch PMU irq on T-Watch2021?");
         }
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        static bool plug = pmu_is_vbus_plug();
+        static bool charging = pmu_is_charging();
+        static bool battery = percent > 0 ? true : false;
+
+        if ( temp_pmu_irq_flag ) {
+            PMU.getIrqStatus();
+            /**
+             * power key short press -> BUTTON_PWR, long press -> quickbar ( see button.cpp )
+             */
+            if ( PMU.isPekeyShortPressIrq() ) {
+                log_d("AXP2101: PEKShortPressIRQ");
+                PMU.clearIrqStatus();
+                pmu_send_cb( PMUCTL_SHORT_PRESS, NULL );
+                return;
+            }
+            if ( PMU.isPekeyLongPressIrq() ) {
+                log_d("AXP2101: PEKLongPressIRQ");
+                PMU.clearIrqStatus();
+                pmu_send_cb( PMUCTL_LONG_PRESS, NULL );
+                return;
+            }
+            if ( PMU.isVbusInsertIrq() ) {
+                log_d("AXP2101: VbusInsertIRQ");
+                powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
+                plug = true;
+            }
+            if ( PMU.isVbusRemoveIrq() ) {
+                log_d("AXP2101: VbusRemoveIRQ");
+                powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
+                plug = false;
+                charging = false;
+            }
+            PMU.clearIrqStatus();
+            pmu_update = true;
+        }
+        /**
+         * refresh cached charge/plug state for the periodic update below
+         */
+        charging = pmu_is_charging();
+        battery = percent > 0 ? true : false;
     #elif defined( WT32_SC01 )
         static bool plug = false;
         static bool charging = false;
@@ -535,6 +627,8 @@ void pmu_shutdown( void ) {
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         TTGOClass *ttgo = TTGOClass::getWatch();
         ttgo->power->shutdown();
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        PMU.shutdown();
     #endif
 #endif
 }
@@ -613,6 +707,12 @@ void pmu_standby( void ) {
         esp_sleep_enable_gpio_wakeup ();
     #elif  defined( LILYGO_WATCH_2021 )
         digitalWrite( PWR_ON, LOW );
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        /**
+         * keep the AXP2101 IRQ able to wake us from light sleep
+         */
+        gpio_wakeup_enable( (gpio_num_t)AXP2101_INT, GPIO_INTR_LOW_LEVEL );
+        esp_sleep_enable_gpio_wakeup();
     #endif
 #endif
 }
@@ -672,6 +772,8 @@ void pmu_wakeup( void ) {
         #endif
     #elif  defined( LILYGO_WATCH_2021 )
         digitalWrite( PWR_ON, HIGH );
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        /* nothing rail-specific to restore yet */
     #endif
 #endif
     /*
@@ -820,6 +922,20 @@ int32_t pmu_get_battery_percent( void ) {
             int32_t tmp_percent = pmu_get_voltage2percent( mV );
             if( tmp_percent )
                 percent = tmp_percent;
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            /**
+             * AXP2101 has a fuel gauge; fall back to the voltage curve if it is not ready
+             */
+            int32_t gauge = PMU.getBatteryPercent();
+            if ( gauge >= 0 ) {
+                percent = gauge;
+            }
+            else {
+                float mV = pmu_get_battery_voltage();
+                int32_t tmp_percent = pmu_get_voltage2percent( mV );
+                if( tmp_percent )
+                    percent = tmp_percent;
+            }
         #elif defined( WT32_SC01 )
             percent = 100;
         #endif
@@ -896,6 +1012,8 @@ float pmu_get_battery_voltage( void ) {
              * calc voltage
              */
             voltage = ( ( battery * 3300 * 2 ) / 4096 ) + 200;
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            voltage = PMU.getBattVoltage();
         #elif defined( WT32_SC01 )
             voltage = 3700.0;
         #endif
@@ -1046,6 +1164,8 @@ float pmu_get_vbus_voltage( void ) {
             TTGOClass *ttgo = TTGOClass::getWatch();
             voltage = ttgo->power->getVbusVoltage();
         #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            voltage = PMU.getVbusVoltage();
         #elif defined( WT32_SC01 )
             voltage = 5.0f;
         #endif
@@ -1088,6 +1208,8 @@ bool pmu_is_charging( void ) {
             charging = ttgo->power->isChargeing();
         #elif defined( LILYGO_WATCH_2021 )
             charging = digitalRead( CHARGE ) ? false : true;
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            charging = PMU.isCharging();
         #elif defined( WT32_SC01 )
             charging = true;
         #endif
@@ -1113,6 +1235,8 @@ bool pmu_is_vbus_plug( void ) {
                 plug = true;
             else
                 plug = false;
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            plug = PMU.isVbusIn();
         #elif defined( WT32_SC01 )
             plug = true;
         #endif

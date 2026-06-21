@@ -42,8 +42,14 @@ static int registed = app_autocall_function( &IRController_setup, 8 );          
         void IRController_setup( void ) {
             return;
         }
-    #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
-        #include <TTGO.h>
+    #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( LILYGO_WATCH_S3_PLUS )
+        #if defined( LILYGO_WATCH_S3_PLUS )
+            #include <twatch_s3_plus_config.h>
+            #define IR_TX_PIN  IR_PIN
+        #else
+            #include <TTGO.h>
+            #define IR_TX_PIN  TWATCH_2020_IR_PIN
+        #endif
         #include <IRremoteESP8266.h>
         #include <IRsend.h>
         // App icon must have an size of 64x64 pixel with an alpha channel
@@ -55,7 +61,7 @@ static int registed = app_autocall_function( &IRController_setup, 8 );          
 
         IRConfig irConfig;
         Application irController;
-        IRsend irsend(TWATCH_2020_IR_PIN);
+        IRsend irsend(IR_TX_PIN);
         lv_style_t irDeskStyle;
 
         /*
@@ -149,8 +155,8 @@ static int registed = app_autocall_function( &IRController_setup, 8 );          
         }
 
         void execute_ir_cmd(InfraButton* config) {
-            pinMode(TWATCH_2020_IR_PIN, OUTPUT);
-            digitalWrite(TWATCH_2020_IR_PIN, LOW); // No Current Limiting so keep it off (!!!)
+            pinMode(IR_TX_PIN, OUTPUT);
+            digitalWrite(IR_TX_PIN, LOW); // No Current Limiting so keep it off (!!!)
 
             for (size_t i = 0; i < config->commandCount; i++) {
                 auto command = config->commands[i];
@@ -202,7 +208,7 @@ static int registed = app_autocall_function( &IRController_setup, 8 );          
             }
 
             delay(50);
-            digitalWrite(TWATCH_2020_IR_PIN, LOW); // No Current Limiting so keep it off (!!!)
+            digitalWrite(IR_TX_PIN, LOW); // No Current Limiting so keep it off (!!!)
             log_i("IR button with %d commands clicked: %s", config->commandCount, config->name);
         }
 
