@@ -1,0 +1,72 @@
+name: Build T-Watch S3 Plus
+
+# Cloud build for the ESP32-S3 port. Produces flashable binaries as a
+# downloadable artifact so the firmware can be built without a local
+# PlatformIO/ESP32-S3 toolchain.
+
+on:
+  push:
+    branches:
+      - claude/eloquent-galileo-yxdevo
+    paths:
+      - 'src/**'
+      - 'lib/**'
+      - 'platformio.ini'
+      - '*.csv'
+      - '.github/workflows/build-t-watch-s3-plus.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Build firmware
+        run: pio run -e t-watch-s3-plus
+
+      - name: Merge flashable image (best effort)
+        continue-on-error: true
+        run: |
+          BUILD=.pio/build/t-watch-s3-plus
+          BOOT_APP0="$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)"
+          ESPTOOL="$(find ~/.platformio/packages/tool-esptoolpy -name esptool.py | head -1)"
+          echo "boot_app0: $BOOT_APP0"
+          echo "esptool:   $ESPTOOL"
+          python "$ESPTOOL" --chip esp32s3 merge_bin -o "$BUILD/firmware-merged.bin" \
+            --flash_mode dio --flash_freq 80m --flash_size 16MB \
+            0x0     "$BUILD/bootloader.bin" \
+            0x8000  "$BUILD/partitions.bin" \
+            0xe000  "$BOOT_APP0" \
+            0x10000 "$BUILD/firmware.bin"
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: t-watch-s3-plus-firmware
+          if-no-files-found: warn
+          path: |
+            .pio/build/t-watch-s3-plus/firmware.bin
+            .pio/build/t-watch-s3-plus/firmware-merged.bin
+            .pio/build/t-watch-s3-plus/bootloader.bin
+            .pio/build/t-watch-s3-plus/partitions.bin
