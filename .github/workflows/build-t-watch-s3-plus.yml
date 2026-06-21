@@ -1,24 +1,39 @@
 name: Build T-Watch S3 Plus
 
 # Cloud build for the ESP32-S3 port. Produces flashable binaries as a
-# downloadable artifact so the firmware can be built without a local
-# PlatformIO/ESP32-S3 toolchain.
+# downloadable artifact, and publishes the web flasher (with the freshly
+# built firmware bundled) to GitHub Pages.
 
 on:
   push:
     branches:
       - claude/eloquent-galileo-yxdevo
+      - master
     paths:
       - 'src/**'
       - 'lib/**'
       - 'platformio.ini'
       - '*.csv'
+      - 'flasher/**'
       - '.github/workflows/build-t-watch-s3-plus.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent Pages deployment.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -72,3 +87,27 @@ jobs:
             .pio/build/t-watch-s3-plus/partitions.bin
             flasher/index.html
             flasher/README.md
+
+      - name: Assemble Pages site
+        run: |
+          mkdir -p site
+          cp flasher/index.html site/index.html
+          cp flasher/README.md site/README.md
+          cp .pio/build/t-watch-s3-plus/firmware-merged.bin site/firmware-merged.bin || true
+          cp .pio/build/t-watch-s3-plus/firmware.bin       site/firmware.bin       || true
+          ls -la site
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true

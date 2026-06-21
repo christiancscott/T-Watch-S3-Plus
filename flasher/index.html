@@ -66,7 +66,11 @@
 
   <div class="step">
     <h2>1 · Select firmware</h2>
-    <label>Choose a <code>.bin</code> file (use <code>firmware-merged.bin</code> from the build artifact for a one-file flash at 0x0)</label>
+    <div id="hosted" hidden style="margin-bottom:14px">
+      <button id="useLatest" class="secondary">⬇︎ Use latest hosted build (firmware-merged.bin)</button>
+      <span class="status" id="hostedStatus"></span>
+    </div>
+    <label>…or choose a <code>.bin</code> file (use <code>firmware-merged.bin</code> for a one-file flash at 0x0)</label>
     <input type="file" id="file" accept=".bin" />
     <div class="row" style="margin-top:12px">
       <div>
@@ -117,6 +121,7 @@
   let transport = null;
   let esploader = null;
   let chip = null;
+  let hostedData = null; // binary string of the co-hosted firmware-merged.bin, if loaded
 
   function log(line, newline = true) {
     logEl.textContent += line + (newline ? "\n" : "");
@@ -142,9 +147,32 @@
     $("compat").style.display = "none";
   }
 
-  $("file").addEventListener("change", () => updateFlashButton());
+  $("file").addEventListener("change", () => { if ($("file").files.length) hostedData = null; updateFlashButton(); });
   function updateFlashButton() {
-    $("flash").disabled = !(esploader && $("file").files.length > 0);
+    $("flash").disabled = !(esploader && ($("file").files.length > 0 || hostedData));
+  }
+
+  // If served over http(s) (e.g. GitHub Pages), offer to flash the co-hosted firmware.
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    $("hosted").hidden = false;
+    $("useLatest").addEventListener("click", async () => {
+      try {
+        $("hostedStatus").textContent = "Downloading…";
+        const resp = await fetch("firmware-merged.bin", { cache: "no-store" });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const buf = new Uint8Array(await resp.arrayBuffer());
+        hostedData = bufToBinaryString(buf);
+        $("file").value = "";
+        $("offset").value = "0x0";
+        $("hostedStatus").textContent = "Loaded " + buf.length.toLocaleString() + " bytes";
+        $("hostedStatus").className = "status ok";
+        updateFlashButton();
+      } catch (e) {
+        hostedData = null;
+        $("hostedStatus").textContent = "Not available (" + (e.message || e) + ")";
+        $("hostedStatus").className = "status err";
+      }
+    });
   }
 
   $("connect").addEventListener("click", async () => {
@@ -177,9 +205,8 @@
     setStatus("Disconnected");
   });
 
-  // Read a File into a Latin1 "binary string" (what esptool-js expects)
-  async function fileToBinaryString(file) {
-    const buf = new Uint8Array(await file.arrayBuffer());
+  // Convert bytes into a Latin1 "binary string" (what esptool-js expects)
+  function bufToBinaryString(buf) {
     let out = "";
     const CHUNK = 0x8000;
     for (let i = 0; i < buf.length; i += CHUNK) {
@@ -189,10 +216,12 @@
   }
 
   $("flash").addEventListener("click", async () => {
-    const file = $("file").files[0];
-    if (!file || !esploader) return;
+    if (!esploader) return;
     const offset = parseInt($("offset").value, 16);
     if (Number.isNaN(offset)) { log("Invalid offset (use hex, e.g. 0x0)"); return; }
+
+    const file = $("file").files[0];
+    if (!file && !hostedData) return;
 
     $("flash").disabled = true;
     $("connect").disabled = true;
@@ -201,8 +230,14 @@
     progressEl.value = 0;
 
     try {
-      log(`\nReading ${file.name} (${file.size.toLocaleString()} bytes)…`);
-      const data = await fileToBinaryString(file);
+      let data;
+      if (file) {
+        log(`\nReading ${file.name} (${file.size.toLocaleString()} bytes)…`);
+        data = bufToBinaryString(new Uint8Array(await file.arrayBuffer()));
+      } else {
+        log(`\nUsing hosted firmware (${hostedData.length.toLocaleString()} bytes)…`);
+        data = hostedData;
+      }
       log(`Flashing at 0x${offset.toString(16)} …`);
       setStatus("Flashing…");
 
