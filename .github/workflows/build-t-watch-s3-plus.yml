@@ -58,20 +58,38 @@ jobs:
       - name: Build firmware
         run: pio run -e t-watch-s3-plus
 
-      - name: Merge flashable image (best effort)
-        continue-on-error: true
+      - name: Merge flashable image
         run: |
           BUILD=.pio/build/t-watch-s3-plus
           BOOT_APP0="$(find ~/.platformio/packages/framework-arduinoespressif32 -name boot_app0.bin | head -1)"
           ESPTOOL="$(find ~/.platformio/packages/tool-esptoolpy -name esptool.py | head -1)"
           echo "boot_app0: $BOOT_APP0"
           echo "esptool:   $ESPTOOL"
+          test -n "$BOOT_APP0" || { echo "::error::boot_app0.bin not found"; exit 1; }
+          test -n "$ESPTOOL"   || { echo "::error::esptool.py not found"; exit 1; }
           python "$ESPTOOL" --chip esp32s3 merge_bin -o "$BUILD/firmware-merged.bin" \
             --flash_mode dio --flash_freq 80m --flash_size 16MB \
             0x0     "$BUILD/bootloader.bin" \
             0x8000  "$BUILD/partitions.bin" \
             0xe000  "$BOOT_APP0" \
             0x10000 "$BUILD/firmware.bin"
+
+      - name: Verify merged image is bootable
+        # A flashable ESP image must begin with the magic byte 0xE9 (the second
+        # stage bootloader). If it does not, the chip writes the file fine but
+        # never boots. Fail the build here so a broken image can never be
+        # published to the artifact or the Pages flasher.
+        run: |
+          BUILD=.pio/build/t-watch-s3-plus
+          F="$BUILD/firmware-merged.bin"
+          test -s "$F" || { echo "::error::firmware-merged.bin missing or empty"; exit 1; }
+          MAGIC="$(od -An -tx1 -N1 "$F" | tr -d ' \n')"
+          SIZE="$(wc -c < "$F")"
+          echo "firmware-merged.bin: first byte 0x$MAGIC, $SIZE bytes"
+          if [ "$MAGIC" != "e9" ]; then
+            echo "::error::firmware-merged.bin does not start with ESP image magic 0xE9 (got 0x$MAGIC) — it would not boot"
+            exit 1
+          fi
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
@@ -91,8 +109,8 @@ jobs:
           mkdir -p site
           cp flasher/index.html site/index.html
           cp flasher/README.md site/README.md
-          cp .pio/build/t-watch-s3-plus/firmware-merged.bin site/firmware-merged.bin || true
-          cp .pio/build/t-watch-s3-plus/firmware.bin       site/firmware.bin       || true
+          cp .pio/build/t-watch-s3-plus/firmware-merged.bin site/firmware-merged.bin
+          cp .pio/build/t-watch-s3-plus/firmware.bin       site/firmware.bin
           ls -la site
 
       - name: Upload Pages artifact
@@ -100,12 +118,18 @@ jobs:
         with:
           path: site
 
-  # Publish the flasher to GitHub Pages. The github-pages environment only
-  # allows the default branch, so this job is gated to master and kept
-  # separate so it never blocks the build on feature branches.
+  # Publish the flasher to GitHub Pages. Kept as a separate job so a Pages /
+  # environment problem can never block the build (and therefore the
+  # downloadable artifact) on a feature branch. Deploys from the active dev
+  # branch as well as master so the hosted flasher always serves the latest
+  # build. NOTE: the github-pages environment must allow these branches under
+  # Settings -> Environments -> github-pages -> Deployment branches (or set it
+  # to "No restriction"), otherwise this job fails the environment gate.
   deploy-pages:
     needs: build
-    if: github.ref == 'refs/heads/master'
+    if: >-
+      github.ref == 'refs/heads/master' ||
+      github.ref == 'refs/heads/claude/eloquent-galileo-yxdevo'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
