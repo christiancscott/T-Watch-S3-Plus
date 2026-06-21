@@ -70,3 +70,5 @@ jobs:
             .pio/build/t-watch-s3-plus/firmware-merged.bin
             .pio/build/t-watch-s3-plus/bootloader.bin
             .pio/build/t-watch-s3-plus/partitions.bin
+            flasher/index.html
+            flasher/README.md

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>T-Watch S3 Plus Web Flasher</title>
+<style>
+  :root {
+    --bg: #0f1320; --panel: #171c2e; --panel2: #1f2740; --text: #e7ecf5;
+    --muted: #93a0bd; --accent: #5b8cff; --accent2: #3fb950; --danger: #f85149;
+    --border: #2a3350;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  .card {
+    width: 100%; max-width: 720px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.4);
+  }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  .step { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+          padding: 16px; margin-bottom: 14px; }
+  .step h2 { margin: 0 0 10px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  input[type=file], input[type=text], select {
+    width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 10px; font-size: 14px;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > div { flex: 1 1 160px; }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 11px 16px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: filter .15s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.1); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.flash { background: var(--accent2); }
+  button.secondary { background: var(--panel2); border: 1px solid var(--border); }
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .status { font-size: 13px; color: var(--muted); margin-left: 4px; }
+  .status.ok { color: var(--accent2); } .status.err { color: var(--danger); }
+  progress { width: 100%; height: 14px; margin-top: 12px; border-radius: 7px; overflow: hidden; }
+  #log {
+    background: #0a0d18; border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    height: 220px; overflow-y: auto; white-space: pre-wrap; color: #c8d3ec; margin-top: 14px;
+  }
+  .warn { background: #3a2a12; border: 1px solid #6b4d1f; color: #f0c674; padding: 10px 12px;
+          border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+  a { color: var(--accent); }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>⌚ T-Watch S3 Plus Web Flasher</h1>
+  <p class="sub">Flash the My-TTGO-Watch firmware to your LilyGo T-Watch S3 Plus straight from the browser — no install required.</p>
+
+  <div class="warn" id="compat">
+    Requires a <b>Chromium browser</b> (Chrome, Edge, Brave, Opera) — Web Serial is not supported in Firefox or Safari.
+  </div>
+
+  <div class="step">
+    <h2>1 · Select firmware</h2>
+    <label>Choose a <code>.bin</code> file (use <code>firmware-merged.bin</code> from the build artifact for a one-file flash at 0x0)</label>
+    <input type="file" id="file" accept=".bin" />
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label>Flash offset</label>
+        <input type="text" id="offset" value="0x0" />
+      </div>
+      <div>
+        <label>Baud rate</label>
+        <select id="baud">
+          <option value="921600" selected>921600 (fast)</option>
+          <option value="460800">460800</option>
+          <option value="115200">115200 (safe)</option>
+        </select>
+      </div>
+    </div>
+    <p class="sub" style="margin:10px 0 0">
+      Flashing only <code>firmware.bin</code> (app only)? Set the offset to <code>0x10000</code>.
+    </p>
+  </div>
+
+  <div class="step">
+    <h2>2 · Connect &amp; flash</h2>
+    <div class="btnrow">
+      <button id="connect">Connect</button>
+      <button id="flash" class="flash" disabled>Flash</button>
+      <button id="disconnect" class="secondary" disabled>Disconnect</button>
+      <span class="status" id="status">Not connected</span>
+    </div>
+    <progress id="progress" value="0" max="100" hidden></progress>
+  </div>
+
+  <div id="log"></div>
+  <p class="sub" style="margin-top:14px">
+    Tip: if the device isn't detected, hold <b>BOOT</b>, tap <b>RST</b>, release BOOT to force download mode, then Connect.
+    This tool talks directly to your device over USB; nothing is uploaded anywhere.
+  </p>
+</div>
+
+<script type="module">
+  import { ESPLoader, Transport } from "https://cdn.jsdelivr.net/npm/esptool-js@0.4/bundle.js";
+
+  const $ = (id) => document.getElementById(id);
+  const logEl = $("log");
+  const statusEl = $("status");
+  const progressEl = $("progress");
+
+  let device = null;     // SerialPort
+  let transport = null;
+  let esploader = null;
+  let chip = null;
+
+  function log(line, newline = true) {
+    logEl.textContent += line + (newline ? "\n" : "");
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setStatus(text, cls = "") {
+    statusEl.textContent = text;
+    statusEl.className = "status " + cls;
+  }
+
+  // esptool-js terminal interface
+  const terminal = {
+    clean() { logEl.textContent = ""; },
+    writeLine(data) { log(data); },
+    write(data) { log(data, false); },
+  };
+
+  // Web Serial availability check
+  if (!("serial" in navigator)) {
+    $("compat").innerHTML = "❌ <b>Web Serial is not available in this browser.</b> Open this page in Chrome, Edge, Brave, or Opera (desktop).";
+    $("connect").disabled = true;
+  } else {
+    $("compat").style.display = "none";
+  }
+
+  $("file").addEventListener("change", () => updateFlashButton());
+  function updateFlashButton() {
+    $("flash").disabled = !(esploader && $("file").files.length > 0);
+  }
+
+  $("connect").addEventListener("click", async () => {
+    try {
+      device = await navigator.serial.requestPort();
+      transport = new Transport(device, true);
+      const baud = parseInt($("baud").value, 10);
+      esploader = new ESPLoader({ transport, baudrate: baud, terminal });
+      setStatus("Connecting…");
+      chip = await esploader.main();
+      log("Detected chip: " + chip);
+      setStatus("Connected · " + chip, "ok");
+      $("connect").disabled = true;
+      $("disconnect").disabled = false;
+      updateFlashButton();
+    } catch (e) {
+      log("Connect error: " + (e.message || e));
+      setStatus("Connect failed", "err");
+      try { await transport?.disconnect(); } catch {}
+      esploader = null; transport = null;
+    }
+  });
+
+  $("disconnect").addEventListener("click", async () => {
+    try { await transport?.disconnect(); } catch {}
+    esploader = null; transport = null; chip = null;
+    $("connect").disabled = false;
+    $("disconnect").disabled = true;
+    $("flash").disabled = true;
+    setStatus("Disconnected");
+  });
+
+  // Read a File into a Latin1 "binary string" (what esptool-js expects)
+  async function fileToBinaryString(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    let out = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < buf.length; i += CHUNK) {
+      out += String.fromCharCode.apply(null, buf.subarray(i, i + CHUNK));
+    }
+    return out;
+  }
+
+  $("flash").addEventListener("click", async () => {
+    const file = $("file").files[0];
+    if (!file || !esploader) return;
+    const offset = parseInt($("offset").value, 16);
+    if (Number.isNaN(offset)) { log("Invalid offset (use hex, e.g. 0x0)"); return; }
+
+    $("flash").disabled = true;
+    $("connect").disabled = true;
+    $("disconnect").disabled = true;
+    progressEl.hidden = false;
+    progressEl.value = 0;
+
+    try {
+      log(`\nReading ${file.name} (${file.size.toLocaleString()} bytes)…`);
+      const data = await fileToBinaryString(file);
+      log(`Flashing at 0x${offset.toString(16)} …`);
+      setStatus("Flashing…");
+
+      await esploader.writeFlash({
+        fileArray: [{ data, address: offset }],
+        flashSize: "keep",
+        eraseAll: false,
+        compress: true,
+        reportProgress: (fileIndex, written, total) => {
+          const pct = Math.round((written / total) * 100);
+          progressEl.value = pct;
+          setStatus("Flashing… " + pct + "%");
+        },
+      });
+
+      log("\n✅ Flash complete.");
+      setStatus("Done — resetting…", "ok");
+      try { await esploader.hardReset(); } catch { log("(Press RST to reboot the watch.)"); }
+    } catch (e) {
+      log("Flash error: " + (e.message || e));
+      setStatus("Flash failed", "err");
+    } finally {
+      progressEl.hidden = true;
+      $("disconnect").disabled = false;
+      $("connect").disabled = true;
+      updateFlashButton();
+    }
+  });
+</script>
+</body>
+</html>
