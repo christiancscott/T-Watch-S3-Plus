@@ -14,6 +14,7 @@
 #include "pmu.h"
 #include "rtcctl.h"
 #include "sdcard.h"
+#include "lora.h"
 #include "wifictl.h"
 #include "blectl.h"
 #include "callback.h"
@@ -313,6 +314,7 @@ void hardware_post_setup( void ) {
 
     sound_setup();
     gpsctl_setup();
+    lora_setup();
     powermgm_set_event( POWERMGM_WAKEUP );
 
     #ifndef NO_BLUETOOTH
