@@ -44,8 +44,9 @@
                 InfraButton** buttons = nullptr;
                 size_t buttonCount = 0;
             };
-        #elif defined( LILYGO_WATCH_2021 )  
+        #elif defined( LILYGO_WATCH_2021 )
         #elif defined( WT32_SC01 )
+        #elif defined( LILYGO_WATCH_S3_PLUS )
         #else
             /**
              * NEW_HARDWARE_TAG or not defined

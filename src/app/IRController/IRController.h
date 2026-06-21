@@ -45,6 +45,8 @@
             void IRController_setup( void );
         #elif defined( WT32_SC01 )
             void IRController_setup( void );
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            void IRController_setup( void );
         #else
             /**
              * NEW_HARDWARE_TAG or not defined
