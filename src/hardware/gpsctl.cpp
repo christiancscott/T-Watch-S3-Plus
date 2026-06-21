@@ -45,6 +45,8 @@
         #include <M5Core2.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include <twatch_s3_plus_config.h>
     #endif
 
     #include <TinyGPS++.h>
@@ -108,10 +110,13 @@ void gpsctl_setup( void ) {
             #elif defined( LILYGO_WATCH_2020_V2 )
                 gpsctl_config.RXPin = GPIO_NUM_36;
                 gpsctl_config.TXPin = GPIO_NUM_26;
+            #elif defined( LILYGO_WATCH_S3_PLUS )
+                gpsctl_config.RXPin = GPS_RX;   /* MCU RX <- u-blox MIA-M10Q TX (GPIO41) */
+                gpsctl_config.TXPin = GPS_TX;   /* MCU TX -> u-blox MIA-M10Q RX (GPIO42) */
             #else
                 gpsctl_config.RXPin = -1;
                 gpsctl_config.TXPin = -1;
-            #endif            
+            #endif
             gpsctl_config.save();
             GPSCTL_ERROR_LOG("set default gps RX on pin %d/TX on pin %d!", gpsctl_config.RXPin, gpsctl_config.TXPin );
         }
