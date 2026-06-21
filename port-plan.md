@@ -51,11 +51,12 @@ pin‑map + library‑selection exercise.
 | Audio out | ESP32 internal DAC via I²S + AXP LDO | **MAX98357A** I²S class‑D amp | **High** |
 | Microphone | none | **PDM digital mic** (new) | Medium (new feature) |
 | GPS | external/optional | **u‑blox MIA‑M10Q** on UART | Medium (Phase 2) |
-| LoRa radio | none | **SX1262** (board‑revision dependent) | Medium (new feature, Phase 2) |
+| LoRa radio | none | **SX1262** *(confirmed for this unit)* | Medium (new feature, Phase 2) |
 | IR | optional IR LED | **IR emitter GPIO 2** | Low (Phase 2) |
 | Wi‑Fi / BLE | ESP32 2.4 GHz / BT classic+BLE | ESP32‑S3 2.4 GHz / **BLE 5 only** | Low |
 | Buttons | AXP202 PEK power key | **AXP2101 PWRKEY** + BOOT | Low–Med |
-| SD card | model dependent | **verify on hardware** (see §8) | Low |
+| SD card | model dependent | **none — no slot on this unit** | n/a (stub) |
+| Battery | ~380–500 mAh | **940 mAh** *(confirmed)* | n/a |
 
 ### Confirmed S3 Plus GPIO map (from LilyGo documentation)
 
@@ -72,8 +73,9 @@ IR emitter: 2
 Power button: dedicated (via AXP2101 PWRKEY);  BOOT: built-in
 ```
 
-> ⚠️ Confirm RST/backlight polarity, the exact SX1262 board revision, and the SD‑card pins against
-> **LilyGoLib's pin header** for this exact board before writing drivers — see §10.
+> ⚠️ Confirm display RST/backlight polarity and the AXP2101 rail map against **LilyGoLib's pin
+> header / board‑init source** for this exact board before writing drivers — see §10. (Radio = SX1262,
+> no SD card, 940 mAh battery are confirmed.)
 
 ---
 
@@ -147,7 +149,7 @@ lib_deps =
     knolleary/PubSubClient@~2.8
     mikalhart/TinyGPSPlus@~1.1.0   ; Phase 2 (GPS)
     h2zero/NimBLE-Arduino@~1.4.3
-    ; jgromes/RadioLib             ; Phase 2 (SX1262 LoRa)
+    jgromes/RadioLib               ; Phase 2 (SX1262 LoRa — confirmed for this unit)
 ```
 
 > ⚠️ **Critical toolchain note.** The 2020 envs use `sharandac/arduino-esp32-hedge` (an ESP32‑only
@@ -200,7 +202,7 @@ Order matches `hardware_setup()`. Each item = add one `#elif defined( LILYGO_WAT
 | 9 | `sound.cpp` + `config/soundconfig` | **MAX98357A** I²S | New branch: `AudioOutputI2S` in *external‑DAC* mode (BCLK48/LRCLK15/DOUT46). Replace AXP LDO power gating with AXP2101 rail / amp `SD` enable. Keep MP3/WAV/SAM generators. |
 | 10 | `wifictl.cpp`, `blectl.cpp` | ESP32‑S3 radio | Should compile unchanged (NimBLE + WiFi work on S3). Verify BT‑classic assumptions — S3 is **BLE‑only**. |
 | 11 | `compass.cpp`, `sensor.cpp` | none on S3 Plus | Add empty/no‑op S3 branch (no magnetometer, no SHT30). |
-| 12 | `sdcard.cpp` | SD (verify) | Add branch only if hardware has a slot (see §8). |
+| 12 | `sdcard.cpp` | none | **No SD slot on this unit** — add a no‑op S3 branch / leave `LILYGO_WATCH_HAS_SDCARD` undefined; hide the SD‑card settings tile. |
 | 13 | GUI/app guards | TTGO refs | Guard files that `#include`/call TTGO directly: `gui/splashscreen.cpp`, `screenshot.cpp`, `setup_tile/utilities`, `watchface`, `sdcard_settings`, `app/gps_status`, `app/IRController`, `app/FindPhone`, `app/activity`. Add S3 branches or `#ifndef` guards. |
 
 **Phase 1 done‑when:** watch boots to the watchface; touch navigates the UI; time keeps via RTC;
@@ -215,7 +217,7 @@ PWRKEY sleep/wake work; BLE pairs with Gadgetbridge; WiFi/webserver/FTP reachabl
 |---|---|---|---|
 | GPS | u‑blox **MIA‑M10Q** | TinyGPSPlus | `gpsctl.cpp` already supports configurable HardwareSerial pins → set UART TX42/RX41. Likely needs an AXP2101 rail powered on. Wire into the existing GPS/tracker/osmmap apps. |
 | Microphone | **PDM mic** (CLK44/DATA47) | ESP‑IDF I²S PDM RX | New capability with no existing consumer. Suggest a minimal “mic level / voice memo” demo or defer until an app needs it. |
-| LoRa | **SX1262** | RadioLib | Entirely new subsystem (no LoRa anywhere in the firmware today). Needs a new `hardware/lora.cpp` + an app (messaging/Meshtastic‑style or raw RX/TX demo). Board‑revision dependent — confirm the radio variant. |
+| LoRa | **SX1262** *(confirmed)* | RadioLib | Entirely new subsystem (no LoRa anywhere in the firmware today). Needs a new `hardware/lora.cpp` + an app (messaging/Meshtastic‑style or raw RX/TX demo). Pins: SCK 3 / MISO 4 / MOSI 1 / CS 5 / DIO1 9 / RST 8 / BUSY 7. RadioLib's `SX1262` class maps directly to these. |
 | IR | IR emitter GPIO2 | IRremoteESP8266 | Re‑point the existing `app/IRController` TX pin to GPIO2. |
 
 ---
@@ -269,8 +271,9 @@ PWRKEY sleep/wake work; BLE pairs with Gadgetbridge; WiFi/webserver/FTP reachabl
 7. **No magnetometer / no environmental sensor.** `compass.cpp` and `sensor.cpp` are no‑ops on this
    board — the **Compass app and any temp/humidity readouts won't function**; hide or stub them.
 8. **BLE‑only (no BT classic).** Confirm nothing in `blectl`/audio assumes A2DP/classic.
-9. **SD card unverified.** The 2020 had model‑dependent SD support. Confirm whether the S3 Plus
-   exposes a microSD slot and on which pins before enabling `sdcard.cpp`; otherwise stub it.
+9. **No SD card.** This unit has no microSD slot — `sdcard.cpp` gets a no‑op S3 branch and the
+   SD‑card settings tile should be hidden. Any feature that assumes SD storage (e.g. some map tile
+   caching) must fall back to SPIFFS/FATFS in the 16 MB flash.
 10. **LVGL 7.11 + TFT_eSPI on S3.** Both are fine on S3 but the TFT_eSPI build must use the
     project‑flag config (above), not a `User_Setup.h` in the library, to stay reproducible.
 11. **`board_build` / custom board JSON.** `esp32-s3-devkitc-1` may not declare 16 MB flash / 8 MB OPI
@@ -299,15 +302,17 @@ on‑device debugging (you cannot validate PMU rails, I²C addresses, or audio i
 
 ## 10. Open questions, ideas & suggestions
 
-**Questions I'd like answered (or will resolve from LilyGoLib's headers):**
-1. **Exact board revision / radio variant?** The docs list SX1262/SX1280/CC1101/LR1121/SI4432
-   options. Which radio does *your* unit have (or do you want LoRa at all)? This decides the Phase‑2
-   LoRa library/driver.
-2. **Display RST and backlight polarity** — the public pin map omits RST (often `-1`/shared on these
-   AMOLED/LCD modules). I'll confirm from LilyGoLib's pin header before writing `display.cpp`.
-3. **Does your unit have a microSD slot?** Determines whether `sdcard.cpp` is implemented or stubbed.
-4. **Battery capacity** for the percentage curve — sources cite 600 mAh and 940 mAh variants; the
-   AXP2101 gauge mostly handles this, but `designed_battery_cap` should match your cell.
+**Resolved for this unit (locked in):**
+* ✅ **Radio = SX1262** → Phase 2 LoRa uses RadioLib's `SX1262` class on the pins in §2.
+* ✅ **No SD card** → `sdcard.cpp` stubbed, SD settings tile hidden, storage falls back to flash.
+* ✅ **Battery = 940 mAh** → set `pmu_config.designed_battery_cap = 940` and seed the
+  voltage→percent curve / AXP2101 gauge accordingly.
+
+**Still to confirm (will resolve from LilyGoLib's pin header — non‑blocking):**
+1. **Display RST and backlight polarity** — the public pin map omits RST (often `-1`/shared on these
+   modules). Confirm before finalizing `display.cpp`.
+2. **AXP2101 rail map** — exactly which LDO/DCDC feeds display, touch, audio amp, GPS, and LoRa.
+   This is the gating detail for the PMU rewrite; take it from LilyGoLib's board‑init source.
 
 **Ideas / suggestions:**
 * **Treat LilyGoLib as the reference, not the dependency.** Since we chose granular libs, I suggest
