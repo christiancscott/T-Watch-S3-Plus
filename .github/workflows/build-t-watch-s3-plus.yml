@@ -1,8 +1,10 @@
 name: Build T-Watch S3 Plus
 
-# Cloud build for the ESP32-S3 port. Produces flashable binaries as a
-# downloadable artifact, and publishes the web flasher (with the freshly
-# built firmware bundled) to GitHub Pages.
+# Cloud build for the ESP32-S3 port. The build job runs on every branch and
+# uploads the flashable binaries + web flasher as a downloadable artifact.
+# A separate deploy job publishes the flasher to GitHub Pages from the
+# default branch (the github-pages environment only permits the default
+# branch, so it must not gate the build job).
 
 on:
   push:
@@ -23,17 +25,13 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent Pages deployment.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: t-watch-s3-plus-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -97,17 +95,24 @@ jobs:
           cp .pio/build/t-watch-s3-plus/firmware.bin       site/firmware.bin       || true
           ls -la site
 
-      - name: Configure Pages
-        id: pages
-        uses: actions/configure-pages@v5
-        continue-on-error: true
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
+  # Publish the flasher to GitHub Pages. The github-pages environment only
+  # allows the default branch, so this job is gated to master and kept
+  # separate so it never blocks the build on feature branches.
+  deploy-pages:
+    needs: build
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        continue-on-error: true

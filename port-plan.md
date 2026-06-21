@@ -24,8 +24,10 @@
 | Phase 1d — audio (MAX98357A) | ⏸️ **deferred** — ESP8266Audio has no version compatible with both the S3 and arduino‑esp32 2.0.x; needs a direct ESP‑IDF `driver/i2s.h` driver |
 | GUI/app guards (IRController stub, tile layouts) | ✅ done |
 | CI cloud build + downloadable artifact + **web flasher on GitHub Pages** | ✅ done |
-| Phase 2 — GPS (MIA‑M10Q over Serial2) | ✅ compiles (needs AXP2101 GPS rail confirmed for live fix) |
-| Phase 2 — LoRa (SX1262), IR (GPIO2), PDM mic | ⏳ pending |
+| Phase 2 — GPS (MIA‑M10Q over Serial2) | ✅ (needs AXP2101 GPS rail confirmed for live fix) |
+| Phase 2 — LoRa (SX1262, RadioLib) + mini LoRa app | ✅ (US915 default; verify TCXO/RF‑switch on hardware) |
+| Phase 2 — IR remote (GPIO2, IRremoteESP8266) | ✅ full IRController app enabled on S3 |
+| Phase 2 — PDM microphone | ⏸️ deferred — no consumer yet; needs an app/use‑case + ESP‑IDF PDM RX |
 | On‑device validation | ⏳ not yet flashed/tested on real hardware |
 
 **Key follow‑ups for real hardware:** audio I²S driver; AXP2101 rail map (which rails feed display/
