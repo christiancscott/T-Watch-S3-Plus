@@ -80,7 +80,7 @@
     /**
      * I2C device addresses
      */
-    #define AXP2101_SLAVE_ADDRESS   0x34
+    /* AXP2101_SLAVE_ADDRESS (0x34) is provided by XPowersLib, do not redefine here */
     #define PCF8563_SLAVE_ADDRESS   0x51
     #define BMA423_SLAVE_ADDRESS    0x18
     #define FT6336_SLAVE_ADDRESS    0x38
