@@ -60,6 +60,11 @@
         #include "TFT_eSPI.h"
 
         TFT_eSPI tft = TFT_eSPI();
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include "TFT_eSPI.h"
+        #include <twatch_s3_plus_config.h>
+
+        TFT_eSPI tft = TFT_eSPI();
     #else
         #error "no hardware driver for framebuffer, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -117,7 +122,7 @@ void framebuffer_setup( void ) {
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->tft->initDMA();
             }
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             framebuffer_use_dma = true;
 
             pinMode( TFT_LED, OUTPUT );
@@ -247,7 +252,7 @@ bool framebuffer_powermgm_loop_cb( EventBits_t event, void *arg ) {
             }
         #elif defined( M5CORE2 )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         #elif defined( WT32_SC01 )
         #else
             #error "no framebuffer powermgm loop event function implemented, please setup minimal drivers ( display/framebuffer/touch )"
@@ -273,7 +278,7 @@ void framebuffer_refresh( void ) {
             max_y = 0;
         #elif defined( M5CORE2 )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
         #elif defined( WT32_SC01 )
         #else
             #error "no framebuffer refresh function implemented, please setup minimal drivers ( display/framebuffer/touch )"
@@ -378,7 +383,7 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
             else
                 ttgo->tft->pushPixels(( uint16_t *)color_p, size);
             ttgo->tft->endWrite();
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             /**
              * get buffer size
              */

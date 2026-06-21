@@ -63,10 +63,13 @@
         #include <M5Core2.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
-    #elif defined( LILYGO_WATCH_2021 )    
+    #elif defined( LILYGO_WATCH_2021 )
         #include <twatch2021_config.h>
         #include <Wire.h>
     #elif defined( WT32_SC01 )
+        #include <Wire.h>
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include <twatch_s3_plus_config.h>
         #include <Wire.h>
     #else
         #error "no hardware init"
@@ -200,7 +203,7 @@ void hardware_setup( void ) {
             /**
              * lvgl init
              */
-            lv_init();     
+            lv_init();
             /**
              * setup wire interface
              */
@@ -213,6 +216,32 @@ void hardware_setup( void ) {
                 Wire.beginTransmission(address);
                 if ( Wire.endTransmission() == 0 )
                     log_i("I2C device at: 0x%02x", address );
+            }
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            /**
+             * lvgl init
+             */
+            lv_init();
+            /**
+             * main I2C bus ( AXP2101 PMU, PCF8563 RTC, BMA423 IMU, DRV2605 haptic )
+             */
+            Wire.begin( IICSDA, IICSCL );
+            /**
+             * dedicated touch I2C bus ( FT6336U )
+             */
+            Wire1.begin( TOUCH_IICSDA, TOUCH_IICSCL );
+            /**
+             * scan both i2c buses
+             */
+            for( uint8_t address = 1; address < 127; address++ ) {
+                Wire.beginTransmission(address);
+                if ( Wire.endTransmission() == 0 )
+                    log_i("main I2C device at: 0x%02x", address );
+            }
+            for( uint8_t address = 1; address < 127; address++ ) {
+                Wire1.beginTransmission(address);
+                if ( Wire1.endTransmission() == 0 )
+                    log_i("touch I2C device at: 0x%02x", address );
             }
         #endif
         /**

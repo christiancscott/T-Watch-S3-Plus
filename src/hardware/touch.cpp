@@ -54,6 +54,12 @@ touch_config_t touch_config;
         #include <Adafruit_FT6206.h>
 
         Adafruit_FT6206 ctp = Adafruit_FT6206();
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        #include <Wire.h>
+        #include <twatch_s3_plus_config.h>
+        #include "TouchDrvFT6X36.hpp"
+
+        TouchDrvFT6X36 ts;
     #else
         #error "no hardware driver for touch, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -149,6 +155,12 @@ void touch_setup( void ) {
     #elif defined( WT32_SC01 )
         pinMode( GPIO_NUM_39, INPUT );
         ASSERT( ctp.begin(40), "Couldn't start FT6206 touchscreen controller");
+    #elif defined( LILYGO_WATCH_S3_PLUS )
+        /*
+        * FT6336U lives on its own I2C bus ( Wire1, GPIO39/40 ), already begun in hardware_setup()
+        */
+        ts.setPins( TOUCH_RST, TOUCH_INT );
+        ASSERT( ts.begin( Wire1, FT6336_SLAVE_ADDRESS, TOUCH_IICSDA, TOUCH_IICSCL ), "FT6336 touch controller failed" );
     #else
         #error "no touch init implemented, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -227,7 +239,7 @@ bool touch_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
             }
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             retval = true;
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             retval = true;
         #elif defined( WT32_SC01 )
             switch( event ) {
@@ -272,7 +284,7 @@ bool touch_powermgm_event_cb( EventBits_t event, void *arg ) {
                                                 break;
         }
     #else
-        #if defined( M5PAPER ) || defined( LILYGO_WATCH_2021 )
+        #if defined( M5PAPER ) || defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             switch( event ) {
                 case POWERMGM_STANDBY:          log_d("go standby");
                                                 retval = true;
@@ -461,6 +473,17 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
             else {
                 return( false );
             }
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            int16_t point_x[ 1 ];
+            int16_t point_y[ 1 ];
+            if ( ts.getPoint( point_x, point_y, 1 ) ) {
+                x = point_x[ 0 ];
+                y = point_y[ 0 ];
+                return( true );
+            }
+            else {
+                return( false );
+            }
         #else
             #error "no touch getXY function implemented, please setup minimal drivers ( display/framebuffer/touch )"
         #endif
@@ -565,7 +588,7 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
                     }
                     break;
             }
-        #elif defined( LILYGO_WATCH_2021 )
+        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
         #elif defined( WT32_SC01 )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
