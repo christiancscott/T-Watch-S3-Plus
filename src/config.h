@@ -78,9 +78,16 @@
             #define HARDWARE_NAME   "wt32-sc01"
             #define RES_X_MAX       480
             #define RES_Y_MAX       320
-            #define USE_PSRAM_ALLOC_LVGL                    /** @brief enabled LVGL to use PSRAM */ 
+            #define USE_PSRAM_ALLOC_LVGL                    /** @brief enabled LVGL to use PSRAM */
             #define ENABLE_FTPSERVER                        /** @brief To disable built-in ftpserver, comment this line */
             #define NO_WATCHFACE
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            #define HARDWARE_NAME   "T-WatchS3Plus"
+            #define RES_X_MAX       240
+            #define RES_Y_MAX       240
+            #define USE_PSRAM_ALLOC_LVGL                    /** @brief enabled LVGL to use PSRAM */
+            #define ENABLE_WEBSERVER                        /** @brief To disable built-in webserver, comment this line */
+            #define ENABLE_FTPSERVER                        /** @brief To disable built-in ftpserver, comment this line */
         #else
             #error "no destination hardware version defined"
         #endif
