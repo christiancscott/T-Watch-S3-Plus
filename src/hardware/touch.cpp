@@ -57,9 +57,30 @@ touch_config_t touch_config;
     #elif defined( LILYGO_WATCH_S3_PLUS )
         #include <Wire.h>
         #include <twatch_s3_plus_config.h>
-        #include "TouchDrvFT6X36.hpp"
 
-        TouchDrvFT6X36 ts;
+        /**
+         * Minimal FocalTech FT6336U reader on the dedicated touch bus ( Wire1 ).
+         * Avoids pulling in a second Bosch-driver library ( SensorLib ) that would
+         * clash with BMA423_Library used by the accelerometer.
+         */
+        static bool ft6336_read_point( int16_t &x, int16_t &y ) {
+            Wire1.beginTransmission( FT6336_SLAVE_ADDRESS );
+            Wire1.write( 0x02 );                                     /* TD_STATUS register */
+            if ( Wire1.endTransmission( false ) != 0 )
+                return( false );
+            if ( Wire1.requestFrom( (uint8_t)FT6336_SLAVE_ADDRESS, (uint8_t)5 ) != 5 )
+                return( false );
+            uint8_t td_status = Wire1.read();                       /* 0x02 number of points */
+            uint8_t xh = Wire1.read();                              /* 0x03 */
+            uint8_t xl = Wire1.read();                              /* 0x04 */
+            uint8_t yh = Wire1.read();                              /* 0x05 */
+            uint8_t yl = Wire1.read();                              /* 0x06 */
+            if ( ( td_status & 0x0F ) == 0 )
+                return( false );
+            x = ( ( xh & 0x0F ) << 8 ) | xl;
+            y = ( ( yh & 0x0F ) << 8 ) | yl;
+            return( true );
+        }
     #else
         #error "no hardware driver for touch, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -157,10 +178,10 @@ void touch_setup( void ) {
         ASSERT( ctp.begin(40), "Couldn't start FT6206 touchscreen controller");
     #elif defined( LILYGO_WATCH_S3_PLUS )
         /*
-        * FT6336U lives on its own I2C bus ( Wire1, GPIO39/40 ), already begun in hardware_setup()
+        * FT6336U lives on its own I2C bus ( Wire1, GPIO39/40 ), already begun in hardware_setup().
+        * Touch is polled; just configure the interrupt pin as input.
         */
-        ts.setPins( TOUCH_RST, TOUCH_INT );
-        ASSERT( ts.begin( Wire1, FT6336_SLAVE_ADDRESS, TOUCH_IICSDA, TOUCH_IICSCL ), "FT6336 touch controller failed" );
+        pinMode( TOUCH_INT, INPUT );
     #else
         #error "no touch init implemented, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -474,11 +495,7 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
                 return( false );
             }
         #elif defined( LILYGO_WATCH_S3_PLUS )
-            int16_t point_x[ 1 ];
-            int16_t point_y[ 1 ];
-            if ( ts.getPoint( point_x, point_y, 1 ) ) {
-                x = point_x[ 0 ];
-                y = point_y[ 0 ];
+            if ( ft6336_read_point( x, y ) ) {
                 return( true );
             }
             else {
