@@ -261,6 +261,13 @@ void hardware_setup( void ) {
     device_setup();
     sdcard_setup();
     powermgm_setup();
+    /*
+     * On the T-Watch S3 Plus the display panel, backlight and haptic motor are
+     * powered from the AXP2101 rails, so the PMU must be brought up before any
+     * of those drivers init - otherwise the panel never gets power and the
+     * watch looks dead. ( SPIFFS is already mounted above for pmu_config. )
+     */
+    pmu_setup();
     button_setup();
     motor_setup();
     display_setup();
@@ -289,9 +296,8 @@ void hardware_setup( void ) {
             }
         }
     #endif
-    splash_screen_stage_update( "init hardware", 60 );  
+    splash_screen_stage_update( "init hardware", 60 );
 
-    pmu_setup();
     bma_setup();
     wifictl_setup();
     touch_setup();
