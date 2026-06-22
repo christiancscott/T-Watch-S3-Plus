@@ -199,6 +199,24 @@ void pmu_setup( void ) {
             PMU.setChargeTargetVoltage( XPOWERS_AXP2101_CHG_VOL_4V2 );
             PMU.setChargerConstantCurr( XPOWERS_AXP2101_CHG_CUR_300MA );
             /**
+             * enable the power rails for the on-board peripherals. Without these
+             * the display panel and backlight have no supply, so the watch looks
+             * dead ( black screen ) even though the CPU is running fine. Rail map
+             * for the LilyGo T-Watch S3 Plus ( AXP2101 ):
+             *   ALDO2 = display backlight   ALDO3 = display panel + touch
+             *   ALDO4 = LoRa ( SX1262 )     BLDO1 = GNSS   BLDO2 = DRV2605 enable
+             */
+            PMU.setALDO2Voltage( 3300 );
+            PMU.enableALDO2();
+            PMU.setALDO3Voltage( 3300 );
+            PMU.enableALDO3();
+            PMU.setALDO4Voltage( 3300 );
+            PMU.enableALDO4();
+            PMU.setBLDO1Voltage( 3300 );
+            PMU.enableBLDO1();
+            PMU.setBLDO2Voltage( 3300 );
+            PMU.enableBLDO2();
+            /**
              * clear and (re)arm the interrupts we care about
              */
             PMU.disableIRQ( XPOWERS_AXP2101_ALL_IRQ );
