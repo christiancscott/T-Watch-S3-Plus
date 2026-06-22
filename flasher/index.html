@@ -102,6 +102,24 @@
     <progress id="progress" value="0" max="100" hidden></progress>
   </div>
 
+  <div class="step">
+    <h2>3 · Serial monitor</h2>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer">
+      <input type="checkbox" id="autoMonitor" checked style="width:auto" />
+      Open the serial monitor automatically after flashing
+    </label>
+    <div class="btnrow">
+      <button id="openMonitor" class="secondary">▶ Open monitor</button>
+      <button id="stopMonitor" class="secondary" disabled>■ Stop</button>
+      <button id="clearLog" class="secondary">Clear log</button>
+      <span class="status" id="monitorStatus">Monitor off</span>
+    </div>
+    <p class="sub" style="margin:10px 0 0">
+      Streams the watch's USB log. If it's stuck in a reboot loop, the panic / backtrace
+      prints here on every cycle — capture a few lines and we can pinpoint the crash.
+    </p>
+  </div>
+
   <div id="log"></div>
   <p class="sub" style="margin-top:14px">
     Tip: if the device isn't detected, hold <b>BOOT</b>, tap <b>RST</b>, release BOOT to force download mode, then Connect.
@@ -177,6 +195,8 @@
 
   $("connect").addEventListener("click", async () => {
     try {
+      // stop the serial monitor if it's holding the port
+      if ( monitorActive ) { monitorAbort = true; try { await monitorReader?.cancel(); } catch {} await sleep(400); }
       device = await navigator.serial.requestPort();
       transport = new Transport(device, true);
       const baud = parseInt($("baud").value, 10);
@@ -258,6 +278,12 @@
       log("\n✅ Flash complete.");
       setStatus("Done — resetting…", "ok");
       try { await esploader.hardReset(); } catch { log("(Press RST to reboot the watch.)"); }
+      if ( $("autoMonitor").checked ) {
+        // hand the port off from esptool to the raw serial monitor
+        try { await transport.disconnect(); } catch {}
+        esploader = null;
+        runMonitor();
+      }
     } catch (e) {
       log("Flash error: " + (e.message || e));
       setStatus("Flash failed", "err");
@@ -268,6 +294,96 @@
       updateFlashButton();
     }
   });
+
+  // ---- Serial monitor -----------------------------------------------------
+  // Streams the device's USB-CDC output. Survives the reboot loop by
+  // reconnecting every time the port drops (each reset re-enumerates USB).
+  let monitorPort = null;      // explicitly picked port (via user gesture)
+  let monitorActive = false;
+  let monitorAbort = false;
+  let monitorReader = null;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function setMonitorUI(on) {
+    $("stopMonitor").disabled = !on;
+    $("openMonitor").disabled = on;
+    $("monitorStatus").textContent = on ? "Monitoring…" : "Monitor off";
+    $("monitorStatus").className = "status" + (on ? " ok" : "");
+  }
+  function trimLog() {
+    if (logEl.textContent.length > 200000)
+      logEl.textContent = logEl.textContent.slice(-160000);
+  }
+  async function pickMonitorPort() {
+    try {
+      const ports = await navigator.serial.getPorts();
+      if (monitorPort && ports.includes(monitorPort)) return monitorPort;
+      if (device && ports.includes(device)) return device;
+      return ports[0] || monitorPort || device || null;
+    } catch {
+      return monitorPort || device || null;
+    }
+  }
+
+  async function runMonitor() {
+    if (monitorActive) return;
+    monitorActive = true; monitorAbort = false;
+    setMonitorUI(true);
+    // let a freshly-reset device re-enumerate its USB CDC first
+    await sleep(600);
+    while (!monitorAbort) {
+      const port = await pickMonitorPort();
+      if (!port) {
+        log("\n[monitor] no serial device — click “Open monitor” to pick the port.\n");
+        await sleep(800);
+        continue;
+      }
+      try {
+        if (!port.readable) await port.open({ baudRate: 115200 });
+      } catch {
+        await sleep(400);
+        continue;
+      }
+      log("\n— serial monitor connected —\n");
+      const dec = new TextDecoder();
+      try {
+        const reader = port.readable.getReader();
+        monitorReader = reader;
+        while (!monitorAbort) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value && value.length) { log(dec.decode(value, { stream: true }), false); trimLog(); }
+        }
+        try { reader.releaseLock(); } catch {}
+      } catch {
+        // device dropped (reboot) — fall through and reconnect
+      } finally {
+        monitorReader = null;
+        try { await port.close(); } catch {}
+      }
+      if (!monitorAbort) { log("\n[monitor] device reset — reconnecting…\n"); await sleep(300); }
+    }
+    monitorActive = false;
+    setMonitorUI(false);
+  }
+
+  $("openMonitor").addEventListener("click", async () => {
+    // release any esptool hold so we can read the port raw
+    try { await transport?.disconnect(); } catch {}
+    esploader = null;
+    $("connect").disabled = false;
+    $("disconnect").disabled = true;
+    updateFlashButton();
+    if (!(await pickMonitorPort())) {
+      try { monitorPort = await navigator.serial.requestPort(); } catch { return; }
+    }
+    runMonitor();
+  });
+  $("stopMonitor").addEventListener("click", async () => {
+    monitorAbort = true;
+    try { await monitorReader?.cancel(); } catch {}
+  });
+  $("clearLog").addEventListener("click", () => { logEl.textContent = ""; });
 </script>
 </body>
 </html>
