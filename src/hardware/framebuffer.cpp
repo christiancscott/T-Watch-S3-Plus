@@ -61,10 +61,9 @@
 
         TFT_eSPI tft = TFT_eSPI();
     #elif defined( LILYGO_WATCH_S3_PLUS )
-        #include "TFT_eSPI.h"
-        #include <twatch_s3_plus_config.h>
+        #include "lgfx_twatch_s3_plus.h"
 
-        TFT_eSPI tft = TFT_eSPI();
+        LGFX_TWatchS3Plus tft;
     #else
         #error "no hardware driver for framebuffer, please setup minimal drivers ( display/framebuffer/touch )"
     #endif
@@ -122,7 +121,7 @@ void framebuffer_setup( void ) {
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->tft->initDMA();
             }
-        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
+        #elif defined( LILYGO_WATCH_2021 )
             framebuffer_use_dma = true;
 
             pinMode( TFT_LED, OUTPUT );
@@ -133,6 +132,18 @@ void framebuffer_setup( void ) {
             tft.init();
             tft.fillScreen( TFT_BLACK );
             tft.initDMA();
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            framebuffer_use_dma = true;
+
+            pinMode( TFT_LED, OUTPUT );
+            ledcSetup( 0, 4000, 8 );
+            ledcAttachPin( TFT_LED, 0 );
+            ledcWrite( 0, 0 );
+
+            /* LovyanGFX manages its own SPI + DMA from the bus config */
+            tft.init();
+            tft.setRotation( 0 );
+            tft.fillScreen( 0x0000 );
         #elif defined( WT32_SC01 )
             framebuffer_use_dma = true;
             tft.init();
@@ -383,7 +394,7 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
             else
                 ttgo->tft->pushPixels(( uint16_t *)color_p, size);
             ttgo->tft->endWrite();
-        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
+        #elif defined( LILYGO_WATCH_2021 )
             /**
              * get buffer size
              */
@@ -405,6 +416,17 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
                 tft.flush();
                 tft.endWrite();
             }
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            /**
+             * LovyanGFX push ( SPI + DMA handled by the bus config ). lv_color_t
+             * is native RGB565 here ( LV_COLOR_16_SWAP undefined = 0 ), which
+             * matches lgfx::rgb565_t so no byte swap is needed.
+             */
+            uint32_t w = ( area->x2 - area->x1 + 1 );
+            uint32_t h = ( area->y2 - area->y1 + 1 );
+            tft.startWrite();
+            tft.pushImage( area->x1, area->y1, w, h, ( lgfx::rgb565_t *)color_p );
+            tft.endWrite();
         #elif defined( WT32_SC01 )
             /**
              * get buffer size
