@@ -244,6 +244,8 @@
       await esploader.writeFlash({
         fileArray: [{ data, address: offset }],
         flashSize: "keep",
+        flashMode: "keep",
+        flashFreq: "keep",
         eraseAll: false,
         compress: true,
         reportProgress: (fileIndex, written, total) => {
