@@ -53,11 +53,20 @@
 
         BMA423 bma;
 
+        /* the BMA423 library ignores the address it passes to these callbacks,
+         * so the device address is pinned here. The S3 board straps the sensor
+         * to 0x19 ( SDO high ); the 2021 watch uses the default 0x18. */
+        #if defined( LILYGO_WATCH_S3_PLUS )
+            #define BMA_DEV_ADDRESS  BMA423_SLAVE_ADDRESS
+        #else
+            #define BMA_DEV_ADDRESS  0x18
+        #endif
+
         uint16_t readRegister(uint8_t address, uint8_t reg, uint8_t *data, uint16_t len) {
-            Wire.beginTransmission(0x18);
+            Wire.beginTransmission(BMA_DEV_ADDRESS);
             Wire.write(reg);
             Wire.endTransmission();
-            Wire.requestFrom((uint8_t)0x18, (uint8_t)len);
+            Wire.requestFrom((uint8_t)BMA_DEV_ADDRESS, (uint8_t)len);
             uint8_t i = 0;
             while (Wire.available()) {
                 data[i++] = Wire.read();
@@ -66,7 +75,7 @@
         }
 
         uint16_t writeRegister(uint8_t address, uint8_t reg, uint8_t *data, uint16_t len) {
-            Wire.beginTransmission(0x18);
+            Wire.beginTransmission(BMA_DEV_ADDRESS);
             Wire.write(reg);
             Wire.write(data, len);
             return (0 !=  Wire.endTransmission());
@@ -171,55 +180,61 @@ void bma_setup( void ) {
             pinMode( BMA423_INT1, INPUT );
             attachInterrupt( BMA423_INT1, bma_irq, GPIO_INTR_POSEDGE );
         #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
-            ASSERT( bma.begin( readRegister, writeRegister, delay ), "BMA423 was not found. Please check wiring/power." );
-            /**
-             * config Accel
-             */
-            Acfg cfg;
-            cfg.odr = BMA4_OUTPUT_DATA_RATE_100HZ;
-            cfg.range = BMA4_ACCEL_RANGE_2G;
-            cfg.bandwidth = BMA4_ACCEL_NORMAL_AVG4;
-            cfg.perf_mode = BMA4_CONTINUOUS_MODE;
-            ASSERT( bma.setAccelConfig( cfg ), "BMA AccelCinfig failed" );
-            ASSERT( bma.enableAccel(), "enable Accel failed");
-            /**
-             * config interrupts
-             */
-            struct bma4_int_pin_config config ;
-            config.edge_ctrl = BMA4_LEVEL_TRIGGER;
-            config.lvl = BMA4_ACTIVE_HIGH;
-            config.od = BMA4_PUSH_PULL;
-            config.output_en = BMA4_OUTPUT_ENABLE;
-            config.input_en = BMA4_INPUT_DISABLE;
-            ASSERT( bma.setINTPinConfig(config, BMA4_INTR1_MAP) , "SetINTPinConfig failed" );
-            /*
-             * init stepcounter interrupt function
-             */
-            pinMode( BMA_INT_1, INPUT );
-            attachInterrupt( BMA_INT_1, bma_irq, GPIO_INTR_POSEDGE );
-            /**
-             * config axes
-             */
-            struct bma423_axes_remap remap_data;
-            remap_data.x_axis = 0;
-            remap_data.x_axis_sign = 1;
-            remap_data.y_axis = 1;
-            remap_data.y_axis_sign = 1;
-            remap_data.z_axis  = 2;
-            remap_data.z_axis_sign  = 1;
-            bma.setRemapAxes( &remap_data );
-            /**
-             * enable features
-             */
-            bma.enableFeature( BMA423_STEP_CNTR, true );
-            bma.enableFeature( BMA423_TILT, true );
-            bma.enableFeature( BMA423_WAKEUP, true );
-            /**
-             * enable Interrupts
-             */
-            bma.enableStepCountInterrupt();
-            bma.enableTiltInterrupt();
-            bma.enableWakeupInterrupt();
+            /* A missing / wrongly-addressed IMU must not brick the watch: log and
+             * keep booting so the display and the rest of the system still come up. */
+            if ( !bma.begin( readRegister, writeRegister, delay ) ) {
+                log_e("BMA423 was not found at 0x%02x - booting without the motion sensor", BMA_DEV_ADDRESS );
+            }
+            else {
+                /**
+                 * config Accel
+                 */
+                Acfg cfg;
+                cfg.odr = BMA4_OUTPUT_DATA_RATE_100HZ;
+                cfg.range = BMA4_ACCEL_RANGE_2G;
+                cfg.bandwidth = BMA4_ACCEL_NORMAL_AVG4;
+                cfg.perf_mode = BMA4_CONTINUOUS_MODE;
+                bma.setAccelConfig( cfg );
+                bma.enableAccel();
+                /**
+                 * config interrupts
+                 */
+                struct bma4_int_pin_config config ;
+                config.edge_ctrl = BMA4_LEVEL_TRIGGER;
+                config.lvl = BMA4_ACTIVE_HIGH;
+                config.od = BMA4_PUSH_PULL;
+                config.output_en = BMA4_OUTPUT_ENABLE;
+                config.input_en = BMA4_INPUT_DISABLE;
+                bma.setINTPinConfig(config, BMA4_INTR1_MAP);
+                /*
+                 * init stepcounter interrupt function
+                 */
+                pinMode( BMA_INT_1, INPUT );
+                attachInterrupt( BMA_INT_1, bma_irq, GPIO_INTR_POSEDGE );
+                /**
+                 * config axes
+                 */
+                struct bma423_axes_remap remap_data;
+                remap_data.x_axis = 0;
+                remap_data.x_axis_sign = 1;
+                remap_data.y_axis = 1;
+                remap_data.y_axis_sign = 1;
+                remap_data.z_axis  = 2;
+                remap_data.z_axis_sign  = 1;
+                bma.setRemapAxes( &remap_data );
+                /**
+                 * enable features
+                 */
+                bma.enableFeature( BMA423_STEP_CNTR, true );
+                bma.enableFeature( BMA423_TILT, true );
+                bma.enableFeature( BMA423_WAKEUP, true );
+                /**
+                 * enable Interrupts
+                 */
+                bma.enableStepCountInterrupt();
+                bma.enableTiltInterrupt();
+                bma.enableWakeupInterrupt();
+            }
         #elif defined( WT32_SC01 )
 
         #endif

@@ -82,7 +82,7 @@
      */
     /* AXP2101_SLAVE_ADDRESS (0x34) is provided by XPowersLib, do not redefine here */
     #define PCF8563_SLAVE_ADDRESS   0x51
-    #define BMA423_SLAVE_ADDRESS    0x18
+    #define BMA423_SLAVE_ADDRESS    0x19    /* SDO tied high on this board ( I2C scan shows 0x19 ) */
     #define FT6336_SLAVE_ADDRESS    0x38
     #define DRV2605_SLAVE_ADDRESS   0x5A
 
