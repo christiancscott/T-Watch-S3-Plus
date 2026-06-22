@@ -510,7 +510,13 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
 
 static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
     bool retval = false;
-    
+    #if defined( LILYGO_WATCH_S3_PLUS ) && !defined( NATIVE_64BIT )
+        /* last reported (processed) point, so a release reports a clean end point
+         * for swipe/gesture detection instead of a stale/garbage sample */
+        static lv_coord_t s3_last_x = 0;
+        static lv_coord_t s3_last_y = 0;
+    #endif
+
     #ifdef NATIVE_64BIT
         retval = mouse_read( drv, data );
     #else
@@ -605,8 +611,19 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
                     }
                     break;
             }
-        #elif defined( LILYGO_WATCH_2021 ) || defined( LILYGO_WATCH_S3_PLUS )
+        #elif defined( LILYGO_WATCH_2021 )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
+        #elif defined( LILYGO_WATCH_S3_PLUS )
+            if ( touch_getXY( data->point.x, data->point.y ) ) {
+                data->state = LV_INDEV_STATE_PR;
+            }
+            else {
+                /* report the last pressed point on release so LVGL sees a clean
+                 * swipe vector ( prevents swipes being misread as taps ) */
+                data->point.x = s3_last_x;
+                data->point.y = s3_last_y;
+                data->state = LV_INDEV_STATE_REL;
+            }
         #elif defined( WT32_SC01 )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
         #else
@@ -632,6 +649,13 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
     if( data->point.x >= lv_disp_get_hor_res( NULL ) ) data->point.x = lv_disp_get_hor_res( NULL ) - 1;
     if( data->point.y < 0 ) data->point.y = 0;
     if( data->point.y >= lv_disp_get_ver_res( NULL ) ) data->point.y = lv_disp_get_ver_res( NULL ) - 1;
+    #if defined( LILYGO_WATCH_S3_PLUS ) && !defined( NATIVE_64BIT )
+        /* remember the processed point while pressed for the release report above */
+        if ( data->state == LV_INDEV_STATE_PR ) {
+            s3_last_x = data->point.x;
+            s3_last_y = data->point.y;
+        }
+    #endif
     /**
      * send touch event
      */

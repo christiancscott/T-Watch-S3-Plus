@@ -242,20 +242,31 @@ void powermgm_loop( void ) {
                 * from here, the consumption is round about 2.5mA
                 * total standby time is 152h (6days) without use?
                 */
-                esp_light_sleep_start();
-                /**
-                 * check wakeup source
-                 */
-                switch( esp_sleep_get_wakeup_cause() ) {
-                    case ESP_SLEEP_WAKEUP_TIMER:
-                        log_d("timer wakeup");
-                        powermgm_set_event( POWERMGM_SILENCE_WAKEUP_REQUEST );
-                        esp_sleep_disable_wakeup_source( ESP_SLEEP_WAKEUP_TIMER );
-                        log_d("disable wakeup timer");
-                        break;
-                    default:
-                        break;
-                }
+                #if defined( LILYGO_WATCH_S3_PLUS )
+                    /*
+                     * esp_light_sleep_start() resets the ESP32-S3 here ( the USB-CDC /
+                     * peripheral state is not restored on wake ), which shows up as the
+                     * watch "rebooting" on standby and the power key "not waking" it.
+                     * Until true light sleep is sorted out on the S3, stay running with
+                     * the screen off so the AXP2101 power-key IRQ reliably wakes the UI.
+                     * ( Costs standby battery - to be optimised later. )
+                     */
+                #else
+                    esp_light_sleep_start();
+                    /**
+                     * check wakeup source
+                     */
+                    switch( esp_sleep_get_wakeup_cause() ) {
+                        case ESP_SLEEP_WAKEUP_TIMER:
+                            log_d("timer wakeup");
+                            powermgm_set_event( POWERMGM_SILENCE_WAKEUP_REQUEST );
+                            esp_sleep_disable_wakeup_source( ESP_SLEEP_WAKEUP_TIMER );
+                            log_d("disable wakeup timer");
+                            break;
+                        default:
+                            break;
+                    }
+                #endif
                 /**
                  * after wakeup set to 240MHz
                  */
