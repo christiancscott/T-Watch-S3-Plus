@@ -142,7 +142,7 @@ void framebuffer_setup( void ) {
 
             /* LovyanGFX manages its own SPI + DMA from the bus config */
             tft.init();
-            tft.setRotation( 0 );
+            tft.setRotation( 2 );   /* panel is mounted 180 deg; flip it upright */
             tft.fillScreen( 0x0000 );
         #elif defined( WT32_SC01 )
             framebuffer_use_dma = true;
