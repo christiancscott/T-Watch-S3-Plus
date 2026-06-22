@@ -298,8 +298,12 @@ void framebuffer_refresh( void ) {
 }
 
 static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
-    if( !framebuffer_drawing )
+    if( !framebuffer_drawing ) {
+            /* drawing disabled ( standby/refresh ): ack the flush and bail, so we
+             * neither push pixels nor call lv_disp_flush_ready twice */
             lv_disp_flush_ready( disp_drv );
+            return;
+    }
 
     #ifdef NATIVE_64BIT
         /**
