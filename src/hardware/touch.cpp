@@ -79,10 +79,6 @@ touch_config_t touch_config;
                 return( false );
             x = ( ( xh & 0x0F ) << 8 ) | xl;
             y = ( ( yh & 0x0F ) << 8 ) | yl;
-            /* the panel is driven at rotation 2 ( 180 deg ), so flip the raw
-             * controller coordinates to match what is shown on screen */
-            x = ( 240 - 1 ) - x;
-            y = ( 240 - 1 ) - y;
             return( true );
         }
     #else
