@@ -228,7 +228,7 @@ void pmu_setup( void ) {
         /**
          * register IRQ pin
          */
-        pinMode( AXP2101_INT, INPUT );
+        pinMode( AXP2101_INT, INPUT_PULLUP );
         attachInterrupt( AXP2101_INT, &pmu_irq, FALLING );
     #endif
 #endif
@@ -727,8 +727,11 @@ void pmu_standby( void ) {
         digitalWrite( PWR_ON, LOW );
     #elif defined( LILYGO_WATCH_S3_PLUS )
         /**
-         * keep the AXP2101 IRQ able to wake us from light sleep
+         * arm the AXP2101 IRQ ( power key ) as a light-sleep wake source. Clear any
+         * pending status first so a fresh key press pulls the line low and the
+         * level-low wakeup fires.
          */
+        PMU.clearIrqStatus();
         gpio_wakeup_enable( (gpio_num_t)AXP2101_INT, GPIO_INTR_LOW_LEVEL );
         esp_sleep_enable_gpio_wakeup();
     #endif
