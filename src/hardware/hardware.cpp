@@ -120,6 +120,13 @@ void hardware_detach_lvgl_ticker( void ) {
 }
 
 void hardware_setup( void ) {
+    /*
+     * print a build banner first thing so the serial log identifies exactly
+     * which firmware is running ( compile date/time is unique per build )
+     */
+    log_i("=====================================================");
+    log_i(" %s firmware - build %s %s", HARDWARE_NAME, __DATE__, __TIME__ );
+    log_i("=====================================================");
     #ifdef NATIVE_64BIT
         /**
          * lvgl init

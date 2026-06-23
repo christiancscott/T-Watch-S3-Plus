@@ -727,13 +727,13 @@ void pmu_standby( void ) {
         digitalWrite( PWR_ON, LOW );
     #elif defined( LILYGO_WATCH_S3_PLUS )
         /**
-         * arm the AXP2101 IRQ ( power key ) as a light-sleep wake source. Clear any
-         * pending status first so a fresh key press pulls the line low and the
-         * level-low wakeup fires.
+         * The S3 does not enter light sleep ( see powermgm.cpp ), so do NOT arm the
+         * level-low GPIO sleep-wakeup here. While the CPU keeps running, a held-low
+         * AXP2101 IRQ line turns the level-triggered wakeup into an interrupt storm
+         * ( Interrupt WDT timeout on CPU1 -> reboot at standby ). Just clear the
+         * pending IRQ; the normal falling-edge pmu_irq still wakes us on a key press.
          */
         PMU.clearIrqStatus();
-        gpio_wakeup_enable( (gpio_num_t)AXP2101_INT, GPIO_INTR_LOW_LEVEL );
-        esp_sleep_enable_gpio_wakeup();
     #endif
 #endif
 }

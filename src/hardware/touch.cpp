@@ -27,6 +27,7 @@
 #include "touch.h"
 #include "powermgm.h"
 #include "callback.h"
+#include "gui/mainbar/mainbar.h"
 
 #include "utils/alloc.h"
 
@@ -86,6 +87,17 @@ touch_config_t touch_config;
     #endif
     volatile bool DRAM_ATTR touch_irq_flag = false;
     portMUX_TYPE DRAM_ATTR Touch_IRQ_Mux = portMUX_INITIALIZER_UNLOCKED;
+    #if defined( LILYGO_WATCH_S3_PLUS ) && !defined( NATIVE_64BIT )
+        /* set by touch_read() when a swipe-up-from-the-bottom is recognised; acted
+         * on from an lv_task ( safe context ) to jump back to the watchface */
+        static volatile bool s3_swipe_home_request = false;
+        static void touch_gesture_task( lv_task_t *task ) {
+            if ( s3_swipe_home_request ) {
+                s3_swipe_home_request = false;
+                mainbar_jump_to_maintile( LV_ANIM_OFF );
+            }
+        }
+    #endif
     void IRAM_ATTR touch_irq( void );
 
     void IRAM_ATTR touch_irq( void ) {
@@ -195,6 +207,10 @@ void touch_setup( void ) {
     indev_drv.type = LV_INDEV_TYPE_POINTER;
     indev_drv.read_cb = touch_read;
     lv_indev_drv_register( &indev_drv );
+    #if defined( LILYGO_WATCH_S3_PLUS ) && !defined( NATIVE_64BIT )
+        /* poll the swipe-up-from-bottom gesture flag in a safe ( non-indev ) context */
+        lv_task_create( touch_gesture_task, 80, LV_TASK_PRIO_LOW, NULL );
+    #endif
     /*
      * register powermgm callback function
      */
@@ -614,10 +630,23 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
         #elif defined( LILYGO_WATCH_2021 )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
         #elif defined( LILYGO_WATCH_S3_PLUS )
+            /* raw start/last point for the swipe-up-from-bottom gesture */
+            static lv_coord_t g_x0 = 0, g_y0 = 0, g_x1 = 0, g_y1 = 0;
+            static bool g_down = false;
             if ( touch_getXY( data->point.x, data->point.y ) ) {
+                if ( !g_down ) { g_x0 = data->point.x; g_y0 = data->point.y; g_down = true; }
+                g_x1 = data->point.x; g_y1 = data->point.y;
                 data->state = LV_INDEV_STATE_PR;
             }
             else {
+                if ( g_down ) {
+                    g_down = false;
+                    /* swipe up starting from the bottom edge -> go home ( phone-style ) */
+                    lv_coord_t dy = g_y0 - g_y1;                        /* up = positive */
+                    lv_coord_t dx = ( g_x0 > g_x1 ) ? ( g_x0 - g_x1 ) : ( g_x1 - g_x0 );
+                    if ( g_y0 >= RES_Y_MAX - 60 && dy >= 60 && dx < 80 )
+                        s3_swipe_home_request = true;
+                }
                 /* report the last pressed point on release so LVGL sees a clean
                  * swipe vector ( prevents swipes being misread as taps ) */
                 data->point.x = s3_last_x;
