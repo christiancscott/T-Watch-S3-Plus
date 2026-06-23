@@ -219,6 +219,12 @@ bool framebuffer_powermgm_event_cb( EventBits_t event, void *arg ) {
                                         break;
         case POWERMGM_WAKEUP:           log_d("go wakeup");
                                         framebuffer_drawing = true;
+                                        #ifndef NATIVE_64BIT
+                                            /* flushes were skipped while in standby, so nothing is
+                                             * dirty on wake and the panel stays blank - force a full
+                                             * repaint of the whole screen */
+                                            lv_obj_invalidate( lv_scr_act() );
+                                        #endif
                                         break;
         case POWERMGM_SILENCE_WAKEUP:   log_d("go wakeup");
                                         framebuffer_drawing = false;

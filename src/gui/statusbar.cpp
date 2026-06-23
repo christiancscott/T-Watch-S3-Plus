@@ -81,7 +81,6 @@ LV_IMG_DECLARE(brightness_32px);
 LV_IMG_DECLARE(sound_32px);
 LV_IMG_DECLARE(sound_mute_32px);
 LV_IMG_DECLARE(gps_64px);
-LV_IMG_DECLARE(maintile_32px);
 LV_FONT_DECLARE(Ubuntu_16px);
 LV_FONT_DECLARE(Ubuntu_32px);
 
@@ -102,7 +101,6 @@ bool should_save_brightness_config = false;
 bool should_save_sound_config = false;
 
 void statusbar_event( lv_obj_t * statusbar, lv_event_t event );
-void statusbar_home_event_cb( lv_obj_t *home, lv_event_t event );
 void statusbar_wifi_event_cb( lv_obj_t *wifi, lv_event_t event );
 void statusbar_bluetooth_event_cb( lv_obj_t *bluetooth, lv_event_t event );
 void statusbar_volume_slider_event_handler_cb( lv_obj_t *sound_slider, lv_event_t event );
@@ -260,13 +258,6 @@ void statusbar_setup( void )
     lv_imgbtn_set_checkable (statusbar_gps, true );
     lv_obj_align( statusbar_gps, statusbar, LV_ALIGN_IN_TOP_LEFT, 8, STATUSBAR_HEIGHT );
     lv_imgbtn_set_state( statusbar_gps, LV_BTN_STATE_CHECKED_PRESSED );
-
-    /*
-     * always-available "home" button in the pulled-down statusbar: returns to the
-     * watchface from any screen ( pairs with the swipe/pull-down to open it ).
-     */
-    lv_obj_t *statusbar_home = wf_add_image_button( statusbar, maintile_32px, statusbar_home_event_cb, &statusbarstyle[ STATUSBAR_STYLE_NORMAL ] );
-    lv_obj_align( statusbar_home, statusbar, LV_ALIGN_IN_TOP_MID, 0, STATUSBAR_HEIGHT + 64 );
 
     statusbar_stepcounterlabel = lv_label_create(statusbar, NULL );
     lv_obj_reset_style_list( statusbar_stepcounterlabel, LV_OBJ_PART_MAIN );
@@ -1006,14 +997,6 @@ void statusbar_set_dark( bool dark_mode ) {
         lv_style_set_bg_color(&statusbarstyle[ STATUSBAR_STYLE_WHITE ], LV_OBJ_PART_MAIN, statusbar_retracted_color );
         lv_style_set_text_color(&statusbarstyle[ STATUSBAR_STYLE_WHITE ], LV_OBJ_PART_MAIN, statusbar_retracted_color );
         lv_style_set_image_recolor(&statusbarstyle[ STATUSBAR_STYLE_WHITE ], LV_OBJ_PART_MAIN, statusbar_retracted_color );
-    }
-}
-
-void statusbar_home_event_cb( lv_obj_t *home, lv_event_t event ) {
-    if ( event == LV_EVENT_CLICKED ) {
-        /* collapse the statusbar and return to the watchface from anywhere */
-        statusbar_expand( false );
-        mainbar_jump_to_maintile( LV_ANIM_OFF );
     }
 }
 
